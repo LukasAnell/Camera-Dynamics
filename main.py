@@ -1,38 +1,50 @@
 import os
-
 import cv2
 import numpy as np
 
 
 def main():
     path = R"spinning rat.mp4"
-    cap = cv2.VideoCapture(path)
-    while not cap.isOpened():
-        cap = cv2.VideoCapture(path)
-        cv2.waitKey(1000)
+
     fourcc = cv2.VideoWriter.fourcc(*'mp4v')
-    out = cv2.VideoWriter('output.mp4', fourcc, 60.0, (int(cap.get(3)),int(cap.get(4))))
+    width = 402
+    height = 360
+    output = cv2.VideoWriter('output.mp4', fourcc, 60.0, (width * 3, height))
+
+    cap = cv2.VideoCapture(path)
+    cap2 = cv2.VideoCapture(path)
+    cap3 = cv2.VideoCapture(path)
 
     frameNumber = -1
     ret, frame = cap.read()
-    while ret and frameNumber <= cap.get(cv2.CAP_PROP_FRAME_COUNT):
+    ret2, frame2 = cap2.read()
+    ret3, frame3 = cap3.read()
+    while ret and ret2 and ret3 and frameNumber <= cap.get(cv2.CAP_PROP_FRAME_COUNT):
         frameNumber += 1
         ret, frame = cap.read()
-        # do something to frame
-        frame = cv2.flip(frame, 1)
-        # write frame to output
-        out.write(frame)
+        ret2, frame2 = cap2.read()
+        ret3, frame3 = cap3.read()
 
-        if frame is not None and not frame.size == 0:
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            # cv2.imshow('frame', gray)
+        # do something to frame
+        bothFrames = cv2.hconcat([frame, frame2, frame3])
+        # write frame to output
+        output.write(bothFrames)
+
+        # if frame is not None and frame2 is not None and not frame.size == 0 and not frame2.size == 0:
+        #     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        #     # cv2.imshow('frame', gray)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
+
     cap.release()
-    out.release()
+    cap2.release()
+    cap3.release()
+    output.release()
+
     cv2.destroyAllWindows()
     os.startfile('output.mp4')
     print("hi")
+    return
 
 
 if __name__ == '__main__':
