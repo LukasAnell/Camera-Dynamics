@@ -7,6 +7,7 @@ def main():
     path = R"spinning rat.mp4"
 
     fourcc = cv2.VideoWriter.fourcc(*'mp4v')
+    # dimensions of video
     width = 402
     height = 360
     output = cv2.VideoWriter('output.mp4', fourcc, 60.0, (width * 3, height))
