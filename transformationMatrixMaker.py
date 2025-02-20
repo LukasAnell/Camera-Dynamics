@@ -1,12 +1,14 @@
 import math
+from numbers import Real
 import numpy as np
+from z3 import *
 
 # assume center at (0, 0, 0)
-cameraPosition = (0, 0, 0)
-cameraForwardVector = (1, 0, 0)
-cameraFocalHeight = 0 # D
-cameraFocalLength = 0 # F
-projectionPlaneDistanceFromCenter = 0 # δ
+cameraPosition = (0.5, math.sqrt(3) / 2, 0)
+cameraForwardVector = (0.5, math.sqrt(3) / 2, 0)
+cameraFocalHeight = 1 # D
+cameraFocalLength = 1 # F
+projectionPlaneDistanceFromCenter = 5 # δ
 # assume camera initially faces (1, 0, 0)
 # and we will rotate the camera to face that once we
 # make the corner vectors
@@ -51,10 +53,10 @@ def transformationMatrixMaker(
         [math.sin(angleBetweenCameras), math.cos(angleBetweenCameras), 0],
         [0, 0, 1]
     ]
-    topRightCornerVector = zRotationMatrix * topRightCornerVector
-    bottomRightCornerVector = zRotationMatrix * bottomRightCornerVector
-    bottomLeftCornerVector = zRotationMatrix * bottomLeftCornerVector
-    topLeftCornerVector = zRotationMatrix * topLeftCornerVector
+    topRightCornerVector = np.matmul(zRotationMatrix, topRightCornerVector)
+    bottomRightCornerVector = np.matmul(zRotationMatrix, bottomRightCornerVector)
+    bottomLeftCornerVector = np.matmul(zRotationMatrix, bottomLeftCornerVector)
+    topLeftCornerVector = np.matmul(zRotationMatrix, topLeftCornerVector)
     # find intersection with delta plane
     # lineParameter = (projectionPlaneDistanceFromCenter - cameraPosition[0]) / (cameraForwardVector[0])
     # sticking everything in an array for convenience
@@ -64,11 +66,53 @@ def transformationMatrixMaker(
         lineParameter = (projectionPlaneDistanceFromCenter - cameraPosition[0]) / projectedLineVector[0]
         c = cameraPosition[1] + lineParameter * projectedLineVector[1]
         d = cameraPosition[2] + lineParameter * projectedLineVector[1]
-        postTransformationImageCoordinates += (c, d)
+        postTransformationImageCoordinates += [[c, d]]
     # use this to convert the intersection point between the projected line and the focal plane
     # converting that into a vector, where we can take the bottom 2 coordinates as the image space coordinate
-    preTransformationPlaneImageSpaceTransformation = [
+    preTransformationPlaneImageSpaceTransformation = np.transpose([
         cameraForwardVector,
-        -np.cross(cameraForwardVector, [1, 0, 0]),
-        [1, 0, 0]
+        -np.cross(cameraForwardVector, [0, 0, 1]),
+        [0, 0, 1]
+    ])
+
+    finalABPositions = []
+    for projectedLineVector in projectedLines:
+        # get rid of first coordinate to get a and b
+        # a is horizontal, b is vertical
+        finalABPositions += [np.matmul(preTransformationPlaneImageSpaceTransformation, projectedLineVector)]
+    # cameraSpaceOrigin = projectionPlaneDistanceFromCenter + postTransformationImageCoordinates[0]
+    # worldBoundingBoxCorners = []
+    # for projectedLineVector in projectedLines:
+    #     cornerVectorLineParameter = (cameraForwardVector * cameraPosition - cameraForwardVector * cameraSpaceOrigin) / (cameraForwardVector * projectedLineVector) # t
+    #     cameraBoundingBoxIntersection = cameraPosition + cornerVectorLineParameter * projectedLineVector
+    finalCDPositions = []
+    for coordinate in postTransformationImageCoordinates:
+        print(coordinate)
+        finalCDPositions += [projectionPlaneDistanceFromCenter, coordinate[0] - postTransformationImageCoordinates[0][0], coordinate[1] - postTransformationImageCoordinates[0][1]]
+    x11 = Real('x11')
+    x12 = Real('x12')
+    x13 = Real('x13')
+    x21 = Real('x21')
+    x22 = Real('x22')
+    x23 = Real('x23')
+    x31 = Real('x31')
+    x32 = Real('x32')
+    x33 = Real('x33')
+    equations = []
+    for i in range(5):
+        currentCD = finalCDPositions[i]
+        currentAB = finalABPositions[i]
+        equations += [
+            currentCD[1] == (currentAB[1] * x11 + currentAB[2] * x12 + x13) / (currentAB[1] * x31 + currentAB[2] * x32 + x33),
+            currentCD[2] == (currentAB[1] * x21 + currentAB[2] * x22 + x23) / (currentAB[1] * x31 + currentAB[2] * x32 + x33)
+        ]
+    solution = solve(equations)
+    return [
+        [solution[x11], solution[x12], solution[x13]],
+        [solution[x21], solution[x22], solution[x23]],
+        [solution[x31], solution[x32], solution[x33]]
     ]
+
+
+if __name__ == '__main__':
+    main()
