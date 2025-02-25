@@ -7,7 +7,7 @@ from z3 import *
 cameraPosition = (0.5, math.sqrt(3) / 2, 0)
 cameraForwardVector = (0.5, math.sqrt(3) / 2, 0)
 cameraFocalHeight = 1 # D
-cameraFocalLength = 1 # F
+cameraFocalLength = math.sqrt(3) # F
 projectionPlaneDistanceFromCenter = 5 # δ
 # assume camera initially faces (1, 0, 0)
 # and we will rotate the camera to face that once we
@@ -34,10 +34,10 @@ def transformationMatrixMaker(
     cameraPositiveZPlaneVector = [math.cos(focalAngle), 0, math.sin(focalAngle)] # Fy
     cameraPositiveYPlaneVector = [math.cos(focalAngle), math.sin(focalAngle), 0] # Fx
     # going counterclockwise starting in quadrant 1 from the view of the camera
-    topRightCornerVector: [] = np.array(cameraPositiveYPlaneVector) - 2 * np.array(cameraForwardVector) + (cameraPositiveZPlaneVector - np.array(cameraForwardVector))
-    bottomRightCornerVector: [] = np.array(cameraPositiveYPlaneVector) - 2 * np.array(cameraForwardVector) - (cameraPositiveZPlaneVector - np.array(cameraForwardVector))
-    bottomLeftCornerVector: [] = np.array(cameraPositiveYPlaneVector) - (np.array(cameraPositiveZPlaneVector) - np.array(cameraForwardVector))
-    topLeftCornerVector: [] = np.array(cameraPositiveYPlaneVector) + (np.array(cameraPositiveZPlaneVector) - np.array(cameraForwardVector))
+    topRightCornerVector: [] = np.array(cameraPositiveYPlaneVector) - 2 * (np.array(cameraPositiveYPlaneVector) - np.array([math.sqrt(2) / 2, 0, 0])) + (np.array(cameraPositiveZPlaneVector) - np.array([math.sqrt(2) / 2, 0, 0]))
+    bottomRightCornerVector: [] = np.array(cameraPositiveYPlaneVector) - 2 * (np.array(cameraPositiveYPlaneVector) - np.array([math.sqrt(2) / 2, 0, 0])) - (np.array(cameraPositiveZPlaneVector) - np.array([math.sqrt(2) / 2, 0, 0]))
+    bottomLeftCornerVector: [] = np.array(cameraPositiveYPlaneVector) - (np.array(cameraPositiveZPlaneVector) - np.array([math.sqrt(2) / 2, 0, 0]))
+    topLeftCornerVector: [] = np.array(cameraPositiveYPlaneVector) + (np.array(cameraPositiveZPlaneVector) - np.array([math.sqrt(2) / 2, 0, 0]))
     # compute the angle between cameras
     # a dot b = |a| * |b| cos(theta)
     # we are assuming magnitude of a and b are 1
@@ -66,7 +66,7 @@ def transformationMatrixMaker(
         lineParameter = (projectionPlaneDistanceFromCenter - cameraPosition[0]) / projectedLineVector[0]
         c = cameraPosition[1] + lineParameter * projectedLineVector[1]
         d = cameraPosition[2] + lineParameter * projectedLineVector[1]
-        postTransformationImageCoordinates += [[c, d]]
+        postTransformationImageCoordinates += [(c, d)]
     # use this to convert the intersection point between the projected line and the focal plane
     # converting that into a vector, where we can take the bottom 2 coordinates as the image space coordinate
     preTransformationPlaneImageSpaceTransformation = np.transpose([
@@ -88,7 +88,7 @@ def transformationMatrixMaker(
     finalCDPositions = []
     for coordinate in postTransformationImageCoordinates:
         print(coordinate)
-        finalCDPositions += [projectionPlaneDistanceFromCenter, coordinate[0] - postTransformationImageCoordinates[0][0], coordinate[1] - postTransformationImageCoordinates[0][1]]
+        finalCDPositions.append((projectionPlaneDistanceFromCenter, coordinate[0] - postTransformationImageCoordinates[0][0], coordinate[1] - postTransformationImageCoordinates[0][1]))
     x11 = Real('x11')
     x12 = Real('x12')
     x13 = Real('x13')
