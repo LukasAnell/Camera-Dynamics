@@ -1,5 +1,7 @@
 import math
 from numbers import Real
+
+import cv2
 import numpy as np
 from z3 import *
 
@@ -9,14 +11,20 @@ cameraPosition = (math.cos(radians), math.sin(radians), 0)
 cameraForwardVector = (math.cos(radians), math.sin(radians), 0)
 cameraFocalHeight = 1 # D
 cameraFocalLength = math.sqrt(3) # F
-projectionPlaneDistanceFromCenter = 5 # δ
+projectionPlaneDistanceFromCenter = 100 # δ
 # assume camera initially faces (1, 0, 0)
 # and we will rotate the camera to face that once we
 # make the corner vectors
 
 def main():
-    result = transformationMatrixMaker(cameraPosition, cameraForwardVector, cameraFocalHeight, cameraFocalLength, projectionPlaneDistanceFromCenter)
-    print(np.matrix(result))
+    transformationMatrix = transformationMatrixMaker(cameraPosition, cameraForwardVector, cameraFocalHeight, cameraFocalLength, projectionPlaneDistanceFromCenter)
+    print(np.matrix(transformationMatrix))
+    # apply result to an image
+    # need to account for blank space after the transformation, in the output image.
+    img = cv2.imread("test2.jpg")
+    img = cv2.warpPerspective(img, transformationMatrix, (img.shape[1], img.shape[0]), cv2.INTER_LINEAR, cv2.BORDER_CONSTANT, 0)
+    # write to file
+    cv2.imwrite("output2.jpg", img)
 
 
 def transformationMatrixMaker(
@@ -50,14 +58,7 @@ def transformationMatrixMaker(
     topLeftCornerVector = np.copy(bottomLeftCornerVector)
     topLeftCornerVector[2] = -bottomLeftCornerVector[2]
 
-    print(topRightCornerVector)
-    print(bottomRightCornerVector)
-    print(bottomLeftCornerVector)
-    print(topLeftCornerVector)
-    print()
-
-    projectedLines = [[1, 0, 0], topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector,
-                      bottomRightCornerVector, cameraPositiveYPlaneVector]
+    projectedLines = [[1, 0, 0], topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector]
     finalABPositions = []
     for projectedLineVector in projectedLines:
         lineParameter = (projectionPlaneDistanceFromCenter - cameraPosition[0]) / projectedLineVector[0]
@@ -84,16 +85,11 @@ def transformationMatrixMaker(
     bottomRightCornerVector = np.matmul(zRotationMatrix, bottomRightCornerVector)
     bottomLeftCornerVector = np.matmul(zRotationMatrix, bottomLeftCornerVector)
     topLeftCornerVector = np.matmul(zRotationMatrix, topLeftCornerVector)
-    cameraPositiveYPlaneVector = np.matmul(zRotationMatrix, cameraPositiveYPlaneVector)
-    print(topRightCornerVector)
-    print(bottomRightCornerVector)
-    print(bottomLeftCornerVector)
-    print(topLeftCornerVector)
-    print()
+
     # find intersection with delta plane
     # lineParameter = (projectionPlaneDistanceFromCenter - cameraPosition[0]) / (cameraForwardVector[0])
     # sticking everything in an array for convenience
-    projectedLines = [cameraForwardVector, topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector, cameraPositiveYPlaneVector]
+    projectedLines = [cameraForwardVector, topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector]
     finalCDPositions = []
     for projectedLineVector in projectedLines:
         lineParameter = (projectionPlaneDistanceFromCenter - cameraPosition[0]) / projectedLineVector[0]
@@ -125,42 +121,24 @@ def transformationMatrixMaker(
     # translate all points in AB and CD so that they're centered at the origin
     ABCenter = finalABPositions[0]
     CDCenter = finalCDPositions[0]
-    for i in range(6):
+    for i in range(5):
         finalABPositions[i][0] -= ABCenter[0]
         finalABPositions[i][1] -= ABCenter[1]
         finalCDPositions[i][0] -= CDCenter[0]
         finalCDPositions[i][1] -= CDCenter[1]
 
-    x11 = Real('x11')
-    x12 = Real('x12')
-    x13 = Real('x13')
-    x21 = Real('x21')
-    x22 = Real('x22')
-    x23 = Real('x23')
-    x31 = Real('x31')
-    x32 = Real('x32')
-    x33 = Real('x33')
-    equations = []
-    for i in range(6):
-        currentCD = finalCDPositions[i]
-        currentAB = finalABPositions[i]
-        equations += [
-            currentCD[0] == (currentAB[0] * x11 + currentAB[1] * x12 + x13) / (currentAB[0] * x31 + currentAB[1] * x32 + x33),
-            currentCD[1] == (currentAB[0] * x21 + currentAB[1] * x22 + x23) / (currentAB[0] * x31 + currentAB[1] * x32 + x33)
-        ]
-    solver = Solver()
-    solver.add(equations)
-    if solver.check() == sat:
-        model = solver.model()
-        solution = [
-            [model[x11].as_decimal(6), model[x12].as_decimal(6), model[x13].as_decimal(6)],
-            [model[x21].as_decimal(6), model[x22].as_decimal(6), model[x23].as_decimal(6)],
-            [model[x31].as_decimal(6), model[x32].as_decimal(6), model[x33].as_decimal(6)]
-        ]
-        return solution
-    else:
-        print("No solution found")
-        return None
+    # use cv2.getPerspectiveTransform to get transformation matrix
+    # AB is the source, CD is the destination
+    # Ensure AB and CD are numpy arrays of type float32 and contain exactly 4 points
+    AB = np.array([tuple(pos) for pos in finalABPositions[1:]], dtype=np.float32)
+    CD = np.array([tuple(pos) for pos in finalCDPositions[1:]], dtype=np.float32)
+
+    # Check if AB and CD have exactly 4 points
+    if AB.shape[0] != 4 or CD.shape[0] != 4:
+        raise ValueError("AB and CD must contain exactly 4 points each")
+
+    transformationMatrix = cv2.getPerspectiveTransform(AB, CD, cv2.DECOMP_LU)
+    return transformationMatrix
 
 
 if __name__ == '__main__':
