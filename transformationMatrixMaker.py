@@ -1,6 +1,5 @@
 import math
 from numbers import Real
-
 import cv2
 import numpy as np
 from z3 import *
@@ -11,7 +10,7 @@ cameraPosition = (math.cos(radians), math.sin(radians), 0)
 cameraForwardVector = (math.cos(radians), math.sin(radians), 0)
 cameraFocalHeight = 1 # D
 cameraFocalLength = math.sqrt(3) # F
-projectionPlaneDistanceFromCenter = 100 # δ
+projectionPlaneDistanceFromCenter = 5 # δ
 # assume camera initially faces (1, 0, 0)
 # and we will rotate the camera to face that once we
 # make the corner vectors
@@ -19,12 +18,12 @@ projectionPlaneDistanceFromCenter = 100 # δ
 def main():
     transformationMatrix = transformationMatrixMaker(cameraPosition, cameraForwardVector, cameraFocalHeight, cameraFocalLength, projectionPlaneDistanceFromCenter)
     print(np.matrix(transformationMatrix))
-    # apply result to an image
-    # need to account for blank space after the transformation, in the output image.
-    img = cv2.imread("test2.jpg")
-    img = cv2.warpPerspective(img, transformationMatrix, (img.shape[1], img.shape[0]), cv2.INTER_LINEAR, cv2.BORDER_CONSTANT, 0)
-    # write to file
-    cv2.imwrite("output2.jpg", img)
+    # calculate output image dimensions based on focal height, focal length, and projection plane distance from center of camera
+    # after transformation, the image will be centered at the origin
+    # so the output image will be 2 * focal height by 2 * focal length
+    sourceImage = cv2.imread("test2.jpg")
+    outputImage = cv2.warpPerspective(sourceImage, transformationMatrix, (int(2 * cameraFocalLength), int(2 * cameraFocalHeight)))
+    cv2.imshow("output", outputImage)
 
 
 def transformationMatrixMaker(
@@ -58,7 +57,7 @@ def transformationMatrixMaker(
     topLeftCornerVector = np.copy(bottomLeftCornerVector)
     topLeftCornerVector[2] = -bottomLeftCornerVector[2]
 
-    projectedLines = [[1, 0, 0], topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector]
+    projectedLines = [[1, 0, 0], topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector, cameraPositiveYPlaneVector]
     finalABPositions = []
     for projectedLineVector in projectedLines:
         lineParameter = (projectionPlaneDistanceFromCenter - cameraPosition[0]) / projectedLineVector[0]
@@ -85,11 +84,12 @@ def transformationMatrixMaker(
     bottomRightCornerVector = np.matmul(zRotationMatrix, bottomRightCornerVector)
     bottomLeftCornerVector = np.matmul(zRotationMatrix, bottomLeftCornerVector)
     topLeftCornerVector = np.matmul(zRotationMatrix, topLeftCornerVector)
+    cameraPositiveYPlaneVector = np.matmul(zRotationMatrix, cameraPositiveYPlaneVector)
 
     # find intersection with delta plane
     # lineParameter = (projectionPlaneDistanceFromCenter - cameraPosition[0]) / (cameraForwardVector[0])
     # sticking everything in an array for convenience
-    projectedLines = [cameraForwardVector, topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector]
+    projectedLines = [cameraForwardVector, topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector, cameraPositiveYPlaneVector]
     finalCDPositions = []
     for projectedLineVector in projectedLines:
         lineParameter = (projectionPlaneDistanceFromCenter - cameraPosition[0]) / projectedLineVector[0]
@@ -130,14 +130,10 @@ def transformationMatrixMaker(
     # use cv2.getPerspectiveTransform to get transformation matrix
     # AB is the source, CD is the destination
     # Ensure AB and CD are numpy arrays of type float32 and contain exactly 4 points
-    AB = np.array([tuple(pos) for pos in finalABPositions[1:]], dtype=np.float32)
-    CD = np.array([tuple(pos) for pos in finalCDPositions[1:]], dtype=np.float32)
+    AB = np.array(finalABPositions[1:-1], dtype=np.float32)
+    CD = np.array(finalCDPositions[1:-1], dtype=np.float32)
 
-    # Check if AB and CD have exactly 4 points
-    if AB.shape[0] != 4 or CD.shape[0] != 4:
-        raise ValueError("AB and CD must contain exactly 4 points each")
-
-    transformationMatrix = cv2.getPerspectiveTransform(AB, CD, cv2.DECOMP_LU)
+    transformationMatrix = cv2.getPerspectiveTransform(AB, CD)
     return transformationMatrix
 
 
