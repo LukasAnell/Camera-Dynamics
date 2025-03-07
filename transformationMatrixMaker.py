@@ -1,16 +1,16 @@
-import math
-from numbers import Real
 import cv2
 import numpy as np
-from z3 import *
+from PIL import Image
+from matplotlib import pyplot as plt
+import math
 
 # assume center at (0, 0, 0)
-radians = math.radians(15)
+radians = math.radians(30)
 cameraPosition = (math.cos(radians), math.sin(radians), 0)
 cameraForwardVector = (math.cos(radians), math.sin(radians), 0)
 cameraFocalHeight = 1 # D
 cameraFocalLength = math.sqrt(3) # F
-projectionPlaneDistanceFromCenter = 5 # δ
+projectionPlaneDistanceFromCenter = 10 # δ
 # assume camera initially faces (1, 0, 0)
 # and we will rotate the camera to face that once we
 # make the corner vectors
@@ -21,9 +21,19 @@ def main():
     # calculate output image dimensions based on focal height, focal length, and projection plane distance from center of camera
     # after transformation, the image will be centered at the origin
     # so the output image will be 2 * focal height by 2 * focal length
+    # sourceImage = Image.open("test2.jpg")
+    # width, height = sourceImage.size
+    # imageTransformed =  sourceImage.transform((2 * int(width), 2 * int(height)), Image.AFFINE, data=transformationMatrix.flatten(), resample=Image.NEAREST)
+    # plt.figure(figsize=(5, 5))
+    # plt.imshow(np.asarray(imageTransformed))
+
     sourceImage = cv2.imread("test2.jpg")
-    outputImage = cv2.warpPerspective(sourceImage, transformationMatrix, (int(2 * cameraFocalLength), int(2 * cameraFocalHeight)))
-    cv2.imshow("output", outputImage)
+    # convert transformationMatrix into a 2x3 matrix
+    transformationMatrix = np.float32(np.reshape(transformationMatrix[:2], (2, 3)))
+    imageTransformed = cv2.warpAffine(sourceImage, transformationMatrix, (sourceImage.shape[1], sourceImage.shape[0]))
+    plt.imshow(cv2.cvtColor(imageTransformed, cv2.COLOR_BGR2RGB))
+
+    plt.show()
 
 
 def transformationMatrixMaker(
@@ -126,6 +136,8 @@ def transformationMatrixMaker(
         finalABPositions[i][1] -= ABCenter[1]
         finalCDPositions[i][0] -= CDCenter[0]
         finalCDPositions[i][1] -= CDCenter[1]
+
+        # finalABPositions[i] = [x * (math.sqrt(projectionPlaneDistanceFromCenter**2 + CDCenter[0]**2 + CDCenter[1]**2) - 1) / (projectionPlaneDistanceFromCenter - 1) for x in finalABPositions[i]]
 
     # use cv2.getPerspectiveTransform to get transformation matrix
     # AB is the source, CD is the destination
