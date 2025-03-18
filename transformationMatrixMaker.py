@@ -69,13 +69,14 @@ def transformationMatrixMaker(
     topLeftCornerVector = np.copy(bottomLeftCornerVector)
     topLeftCornerVector[2] = -bottomLeftCornerVector[2]
 
-    projectedLines = [[1, 0, 0], topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector, cameraPositiveYPlaneVector]
-    finalABPositions = []
-    for projectedLineVector in projectedLines:
-        lineParameter = (projectionPlaneDistanceFromCenter - cameraPosition[0]) / projectedLineVector[0]
-        a = cameraPosition[1] + lineParameter * projectedLineVector[1]
-        b = cameraPosition[2] + lineParameter * projectedLineVector[2]
-        finalABPositions += [[a, b]]
+    # projectedLines = [[1, 0, 0], topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector]
+    # finalABPositions = []
+    # for projectedLineVector in projectedLines:
+    #     lineParameter = (projectionPlaneDistanceFromCenter - 1) / projectedLineVector[0]
+    #     a = cameraPosition[1] + lineParameter * projectedLineVector[1]
+    #     b = cameraPosition[2] + lineParameter * projectedLineVector[2]
+    #     finalABPositions += [[a, b]]
+    finalABPositions = [[0,0],[1,1],[-1,1],[-1,-1],[1,-1]]
 
     # compute the angle between cameras
     # a dot b = |a| * |b| cos(theta)
@@ -101,7 +102,7 @@ def transformationMatrixMaker(
     # find intersection with delta plane
     # lineParameter = (projectionPlaneDistanceFromCenter - cameraPosition[0]) / (cameraForwardVector[0])
     # sticking everything in an array for convenience
-    projectedLines = [cameraForwardVector, topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector, cameraPositiveYPlaneVector]
+    projectedLines = [cameraForwardVector, topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector]
     finalCDPositions = []
     for projectedLineVector in projectedLines:
         lineParameter = (projectionPlaneDistanceFromCenter - cameraPosition[0]) / projectedLineVector[0]
@@ -133,41 +134,49 @@ def transformationMatrixMaker(
     # translate all points in AB and CD so that they're centered at the origin
     # use image dimensions to scale the points
 
-    imageHeight = abs(finalCDPositions[1][1] - finalCDPositions[4][1])
-    imageResolutionHeight = imageDimensions[0] / imageHeight
-    for i in range(5):
+    imageHeight = abs(finalCDPositions[2][1] - finalCDPositions[3][1])
+    imageResolutionHeight = imageDimensions[1] / imageHeight
+
+    for i in range(len(finalCDPositions)):
         finalCDPositions[i][0] *= imageResolutionHeight
         finalCDPositions[i][1] *= imageResolutionHeight
 
     CDCenterX = finalCDPositions[1][0]
-    CDCenterY = finalCDPositions[4][1]
+    CDCenterY = finalCDPositions[3][1]
 
-    for i in range(5):
-        finalCDPositions[i][0] -= CDCenterY
-        finalCDPositions[i][1] -= CDCenterX
+    for i in range(len(finalCDPositions)):
+        finalCDPositions[i][0] -= CDCenterX
+        finalCDPositions[i][1] -= CDCenterY
+
+    # ABCenter = finalABPositions[3]
+    # ABTopRightDestination = [finalABPositions[1][0] - ABCenter[0], finalABPositions[1][1] - ABCenter[1]]
+    # xScalingFactor = finalCDPositions[1][0] / ABTopRightDestination[0]
+    imageHeight = abs(finalABPositions[1][1] - finalABPositions[4][1])
+    imageResolutionHeight = imageDimensions[1] / imageHeight
+
+
+
+    for i in range(len(finalABPositions)):
+        finalABPositions[i] = [finalABPositions[i][0] * imageResolutionHeight, finalABPositions[i][1] * imageResolutionHeight]
 
     ABCenter = finalABPositions[3]
-    ABTopRightDestination = [finalABPositions[1][0] - ABCenter[0], finalABPositions[1][1] - ABCenter[1]]
-    xScalingFactor = finalCDPositions[1][0] / ABTopRightDestination[0]
+    for i in range(len(finalABPositions)):
+        finalABPositions[i] = [finalABPositions[i][0] - ABCenter[0], finalABPositions[i][1] - ABCenter[1]]
 
-    for i in range(5):
-        finalABPositions[i][0] *= xScalingFactor
-        finalABPositions[i][1] *= xScalingFactor
-
-    ABCenter = finalABPositions[3]
-    for i in range(5):
-        finalABPositions[i][0] -= ABCenter[0]
-        finalABPositions[i][1] -= ABCenter[1]
+    for point in finalABPositions[1:]:
+        print("(%.4f, %.4f)" % (point[0], point[1]))
+    print()
+    for point in finalCDPositions[1:]:
+        print("(%.4f, %.4f)" % (point[0], point[1]))
+    print()
 
         # finalABPositions[i] = [x * (math.sqrt(projectionPlaneDistanceFromCenter**2 + CDCenter[0]**2 + CDCenter[1]**2) - 1) / (projectionPlaneDistanceFromCenter - 1) for x in finalABPositions[i]]
 
     # use cv2.getPerspectiveTransform to get transformation matrix
     # AB is the source, CD is the destination
     # Ensure AB and CD are numpy arrays of type float32 and contain exactly 4 points
-    AB = np.array(finalABPositions[1:-1], dtype=np.float32)
-    CD = np.array(finalCDPositions[1:-1], dtype=np.float32)
-    print(AB)
-    print(CD)
+    AB = np.array(finalABPositions[1:], dtype=np.float32)
+    CD = np.array(finalCDPositions[1:], dtype=np.float32)
 
     transformationMatrix = cv2.getPerspectiveTransform(AB, CD)
     return transformationMatrix
