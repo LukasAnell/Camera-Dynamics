@@ -16,8 +16,9 @@ projectionPlaneDistanceFromCenter = 10 # δ
 # make the corner vectors
 
 def main():
-    transformationMatrix = transformationMatrixMaker(cameraPosition, cameraForwardVector, cameraFocalHeight, cameraFocalLength, projectionPlaneDistanceFromCenter)
+    transformationMatrix = transformationMatrixMaker(cameraPosition, cameraForwardVector, cameraFocalHeight, cameraFocalLength, projectionPlaneDistanceFromCenter, (460, 341))
     print(np.matrix(transformationMatrix))
+
     # calculate output image dimensions based on focal height, focal length, and projection plane distance from center of camera
     # after transformation, the image will be centered at the origin
     # so the output image will be 2 * focal height by 2 * focal length
@@ -41,7 +42,8 @@ def transformationMatrixMaker(
         cameraForwardVector: [],
         cameraFocalHeight: float,
         cameraFocalLength: float,
-        projectionPlaneDistanceFromCenter: float
+        projectionPlaneDistanceFromCenter: float,
+        imageDimensions: (int, int) # width, height
 ) -> []:
     # first construct camera bounding corners
     focalAngle: float = math.atan(cameraFocalHeight / cameraFocalLength)
@@ -129,13 +131,33 @@ def transformationMatrixMaker(
     #     finalCDPositions.append((projectionPlaneDistanceFromCenter, coordinate[0] - postTransformationImageCoordinates[0][0], coordinate[1] - postTransformationImageCoordinates[0][1]))
 
     # translate all points in AB and CD so that they're centered at the origin
-    ABCenter = finalABPositions[0]
-    CDCenter = finalCDPositions[0]
+    # use image dimensions to scale the points
+
+    imageHeight = abs(finalCDPositions[1][1] - finalCDPositions[4][1])
+    imageResolutionHeight = imageDimensions[0] / imageHeight
+    for i in range(5):
+        finalCDPositions[i][0] *= imageResolutionHeight
+        finalCDPositions[i][1] *= imageResolutionHeight
+
+    CDCenterX = finalCDPositions[1][0]
+    CDCenterY = finalCDPositions[4][1]
+
+    for i in range(5):
+        finalCDPositions[i][0] -= CDCenterY
+        finalCDPositions[i][1] -= CDCenterX
+
+    ABCenter = finalABPositions[3]
+    ABTopRightDestination = [finalABPositions[1][0] - ABCenter[0], finalABPositions[1][1] - ABCenter[1]]
+    xScalingFactor = finalCDPositions[1][0] / ABTopRightDestination[0]
+
+    for i in range(5):
+        finalABPositions[i][0] *= xScalingFactor
+        finalABPositions[i][1] *= xScalingFactor
+
+    ABCenter = finalABPositions[3]
     for i in range(5):
         finalABPositions[i][0] -= ABCenter[0]
         finalABPositions[i][1] -= ABCenter[1]
-        finalCDPositions[i][0] -= CDCenter[0]
-        finalCDPositions[i][1] -= CDCenter[1]
 
         # finalABPositions[i] = [x * (math.sqrt(projectionPlaneDistanceFromCenter**2 + CDCenter[0]**2 + CDCenter[1]**2) - 1) / (projectionPlaneDistanceFromCenter - 1) for x in finalABPositions[i]]
 
@@ -144,6 +166,8 @@ def transformationMatrixMaker(
     # Ensure AB and CD are numpy arrays of type float32 and contain exactly 4 points
     AB = np.array(finalABPositions[1:-1], dtype=np.float32)
     CD = np.array(finalCDPositions[1:-1], dtype=np.float32)
+    print(AB)
+    print(CD)
 
     transformationMatrix = cv2.getPerspectiveTransform(AB, CD)
     return transformationMatrix
