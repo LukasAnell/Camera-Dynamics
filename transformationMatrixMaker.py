@@ -29,7 +29,6 @@ def main():
     #
     # plt.show()
 
-
     transformationMatrix = transformationMatrixMaker(cameraPosition, cameraForwardVector, cameraFocalHeight, cameraFocalLength, projectionPlaneDistanceFromCenter, (460, 341))
     print(np.matrix(transformationMatrix))
 
@@ -46,8 +45,8 @@ def main():
     # convert transformationMatrix into a 2x3 matrix
     # transformationMatrix = np.float32(np.reshape(transformationMatrix[:2], (2, 3)))
 
-    # flip transformationMatrix along the y axis
-    # sourceImage = cv2.flip(sourceImage, 1)
+    # flip transformationMatrix along the y-axis
+    sourceImage = cv2.flip(sourceImage, 1)
 
     imageTransformed = cv2.warpPerspective(sourceImage, transformationMatrix, (sourceImage.shape[1], sourceImage.shape[0]))
 
@@ -97,10 +96,22 @@ def transformationMatrixMaker(
     #     finalABPositions += [[a, b]]
     finalABPositions = [[0,0],[1,1],[-1,1],[-1,-1],[1,-1]]
 
+
+    projectedLines = [cameraForwardVector, topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector]
+    # print projected lines so that they can be copy pasted into 3D desmos
+    for projectedLineVector in projectedLines:
+        print(
+            "(t * %.4f, t * %.4f, t * %.4f)" % (projectedLineVector[0], projectedLineVector[1], projectedLineVector[2])
+            )
+    print()
+
     # compute the angle between cameras
     # a dot b = |a| * |b| cos(theta)
     # we are assuming magnitude of a and b are 1
     angleBetweenCameras = math.acos(np.dot(cameraForwardVector, [1, 0, 0]))
+    if cameraForwardVector[1] < 0:
+        angleBetweenCameras = -angleBetweenCameras
+
     # construct rotation matrix
     """
     cosθ, -sinθ, 0
@@ -128,6 +139,13 @@ def transformationMatrixMaker(
         c = cameraPosition[1] + lineParameter * projectedLineVector[1]
         d = cameraPosition[2] + lineParameter * projectedLineVector[2]
         finalCDPositions += [[c, d]]
+
+
+    # print projected lines so that they can be copy pasted into 3D desmos
+    for projectedLineVector in projectedLines:
+        print("(t * %.4f, t * %.4f, t * %.4f)" % (projectedLineVector[0], projectedLineVector[1], projectedLineVector[2]))
+    print()
+
     # use this to convert the intersection point between the projected line and the focal plane
     # converting that into a vector, where we can take the bottom 2 coordinates as the image space coordinate
     # preTransformationPlaneImageSpaceTransformation = np.transpose([
@@ -223,12 +241,12 @@ def transformationMatrixMaker(
         finalCDPositions[i][1] *= yScalingFactorCD
 
 
-    # for point in finalABPositions[1:]:
-    #     print("(%.4f, %.4f)" % (point[0], point[1]))
-    # print()
-    # for point in finalCDPositions[1:]:
-    #     print("(%.4f, %.4f)" % (point[0], point[1]))
-    # print()
+    for point in finalABPositions[1:]:
+        print("(%.4f, %.4f)" % (point[0], point[1]))
+    print()
+    for point in finalCDPositions[1:]:
+        print("(%.4f, %.4f)" % (point[0], point[1]))
+    print()
 
 
 
