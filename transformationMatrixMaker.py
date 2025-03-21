@@ -5,12 +5,6 @@ from matplotlib import pyplot as plt
 import math
 
 # assume center at (0, 0, 0)
-radians = math.radians(30)
-cameraPosition = (math.cos(radians), math.sin(radians), 0)
-cameraForwardVector = (math.cos(radians), math.sin(radians), 0)
-cameraFocalHeight = 1 # D
-cameraFocalLength = math.sqrt(3) # F
-projectionPlaneDistanceFromCenter = 10 # δ
 # assume camera initially faces (1, 0, 0)
 # and we will rotate the camera to face that once we
 # make the corner vectors
@@ -28,7 +22,11 @@ def main():
     # plt.imshow(cv2.cvtColor(imageTransformed, cv2.COLOR_BGR2RGB))
     #
     # plt.show()
-
+    cameraOffsetDegrees = 30
+    cameraFocalHeight = 1  # D
+    cameraFocalLength = math.sqrt(3)  # F
+    projectionPlaneDistanceFromCenter = 10  # δ
+    cameraPosition, cameraForwardVector, cameraFocalHeight, cameraFocalLength, projectionPlaneDistanceFromCenter = getStartingConditions(cameraOffsetDegrees, cameraFocalHeight, cameraFocalLength, projectionPlaneDistanceFromCenter)
     transformationMatrix = transformationMatrixMaker(cameraPosition, cameraForwardVector, cameraFocalHeight, cameraFocalLength, projectionPlaneDistanceFromCenter, (460, 341))
     print(np.matrix(transformationMatrix))
 
@@ -53,6 +51,23 @@ def main():
     plt.imshow(cv2.cvtColor(imageTransformed, cv2.COLOR_BGR2RGB))
 
     plt.show()
+
+
+def getStartingConditions(cameraOffsetDegrees: float, cameraFocalHeight: float, cameraFocalLength: float, projectionPlaneDistanceFromCenter: float):
+    radians = math.radians(cameraOffsetDegrees)
+    cameraPosition = (math.cos(radians), math.sin(radians), 0)
+    cameraForwardVector = (math.cos(radians), math.sin(radians), 0)
+    # cameraFocalHeight = 1  # D
+    # cameraFocalLength = math.sqrt(3)  # F
+    # projectionPlaneDistanceFromCenter = 10  # δ
+    return cameraPosition, cameraForwardVector, cameraFocalHeight, cameraFocalLength, projectionPlaneDistanceFromCenter
+
+
+def getTransformedImage(transformationMatrix, sourceImage):
+    # convert transformationMatrix into a 2x3 matrix
+    # transformationMatrix = np.float32(np.reshape(transformationMatrix[:2], (2, 3)))
+    imageTransformed = cv2.warpPerspective(sourceImage, transformationMatrix, (sourceImage.shape[1], sourceImage.shape[0]))
+    return imageTransformed
 
 
 def transformationMatrixMaker(
@@ -97,13 +112,11 @@ def transformationMatrixMaker(
     finalABPositions = [[0,0],[1,1],[-1,1],[-1,-1],[1,-1]]
 
 
-    projectedLines = [cameraForwardVector, topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector]
-    # print projected lines so that they can be copy pasted into 3D desmos
-    for projectedLineVector in projectedLines:
-        print(
-            "(t * %.4f, t * %.4f, t * %.4f)" % (projectedLineVector[0], projectedLineVector[1], projectedLineVector[2])
-            )
-    print()
+    # projectedLines = [cameraForwardVector, topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector]
+    # # print projected lines so that they can be copy pasted into 3D desmos
+    # for projectedLineVector in projectedLines:
+    #     print("(t * %.4f, t * %.4f, t * %.4f)" % (projectedLineVector[0], projectedLineVector[1], projectedLineVector[2]))
+    # print()
 
     # compute the angle between cameras
     # a dot b = |a| * |b| cos(theta)
@@ -141,10 +154,10 @@ def transformationMatrixMaker(
         finalCDPositions += [[c, d]]
 
 
-    # print projected lines so that they can be copy pasted into 3D desmos
-    for projectedLineVector in projectedLines:
-        print("(t * %.4f, t * %.4f, t * %.4f)" % (projectedLineVector[0], projectedLineVector[1], projectedLineVector[2]))
-    print()
+    # print projected lines so that they can be copied and pasted into 3D desmos
+    # for projectedLineVector in projectedLines:
+    #     print("(t * %.4f, t * %.4f, t * %.4f)" % (projectedLineVector[0], projectedLineVector[1], projectedLineVector[2]))
+    # print()
 
     # use this to convert the intersection point between the projected line and the focal plane
     # converting that into a vector, where we can take the bottom 2 coordinates as the image space coordinate

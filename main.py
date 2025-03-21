@@ -1,9 +1,47 @@
 import os
 import cv2
 import numpy as np
+from transformationMatrixMaker import *
 
 
 def main():
+    leftPath = R"Test Images\left.jpg"
+    middlePath = R"Test Images\middle.jpg"
+    rightPath = R"Test Images\right.jpg"
+    stitchThreeImages([leftPath, middlePath, rightPath], 30)
+
+
+
+def stitchThreeImages(paths: [], cameraOffsetDegrees):
+    images = []
+    for path in paths:
+        img = cv2.imread(path)
+        if img is None:
+            print(f"Error loading image at {path}")
+            return
+        images.append(img)
+
+    transformedImages = []
+    for img in images:
+        h, w = img.shape[:2]
+        transformationMatrix = transformationMatrixMaker(
+            cameraPosition=[0, 0, 0],
+            cameraForwardVector=[1, 0, 0],
+            cameraFocalHeight=1.0,
+            cameraFocalLength=math.sqrt(3),
+            projectionPlaneDistanceFromCenter=10,
+            imageDimensions=(w, h)
+        )
+        transformedImg = cv2.warpPerspective(img, transformationMatrix, (w, h))
+        transformedImages.append(transformedImg)
+
+    stitchedImages = cv2.hconcat(transformedImages)
+    cv2.imshow('stitched', stitchedImages)
+    cv2.waitKey(0)
+    cv2.destroyAllWindows()
+
+
+def stitchVideos():
     path = R"spinning rat.mp4"
 
     fourcc = cv2.VideoWriter.fourcc(*'mp4v')
