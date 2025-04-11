@@ -84,3 +84,5 @@ class imageManipulation:
         return transformedImage
 
 
+    def combine3Images(self, images: []):
+
