@@ -2,14 +2,32 @@ import os
 import cv2
 import numpy as np
 from transformationMatrixMaker import *
+import imageTransformer
 
 
 def main():
-    leftPath = R"Test Images\left.jpg"
-    middlePath = R"Test Images\middle.jpg"
-    rightPath = R"Test Images\right.jpg"
-    stitchThreeImages([leftPath, middlePath, rightPath], 30)
-
+    leftPath = R"Test Images\left.jpeg"
+    middlePath = R"Test Images\middle.jpeg"
+    rightPath = R"Test Images\right.jpeg"
+    # stitchThreeImages([leftPath, middlePath, rightPath], 30)
+    print("hi")
+    ImageTransformer = imageTransformer.ImageTransformer(
+        leftImage=cv2.imread(leftPath),
+        middleImage=cv2.imread(middlePath),
+        rightImage=cv2.imread(rightPath),
+        leftAngle=-30,
+        rightAngle=30,
+        cameraFocalHeight=1.0,
+        cameraFocalLength=math.sqrt(3),
+        projectionPlaneDistanceFromCenter=10,
+        imageDimensions=(3024, 4072) # (width, height)
+    )
+    print("hi")
+    ImageTransformer.transformLeftImage()
+    ImageTransformer.transformMiddleImage()
+    ImageTransformer.transformRightImage()
+    ImageTransformer.saveStitchedImage("stitchedImage.jpg")
+    print("hi")
 
 
 def stitchThreeImages(paths: [], cameraOffsetDegrees):
