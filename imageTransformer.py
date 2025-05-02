@@ -16,6 +16,7 @@ class ImageTransformer:
         self.projectionPlaneDistanceFromCenter = projectionPlaneDistanceFromCenter
         self.imageDimensions = imageDimensions  # (width, height)
 
+
     def getTransformationMatrix(self, cameraPosition, cameraForwardVector):
         """Generate a transformation matrix for the given camera parameters."""
         return transformationMatrixMaker(
@@ -25,7 +26,42 @@ class ImageTransformer:
             cameraFocalLength=self.cameraFocalLength,
             projectionPlaneDistanceFromCenter=self.projectionPlaneDistanceFromCenter,
             imageDimensions=self.imageDimensions
+        )[0]
+
+
+    def getStartingEndingCoordinates(self, cameraPosition, cameraForwardVector):
+        # Can be obtained by using transformationMatrixMaker and storing the 2nd and 3rd elements of the tuple
+        transformationMatrix = transformationMatrixMaker(
+            cameraPosition=cameraPosition,
+            cameraForwardVector=cameraForwardVector,
+            cameraFocalHeight=self.cameraFocalHeight,
+            cameraFocalLength=self.cameraFocalLength,
+            projectionPlaneDistanceFromCenter=self.projectionPlaneDistanceFromCenter,
+            imageDimensions=self.imageDimensions
         )
+        startingCoordinates = transformationMatrix[1]
+        endingCoordinates = transformationMatrix[2]
+        return startingCoordinates, endingCoordinates
+
+
+    def getScalingFactor(self, cameraPosition, cameraForwardVector):
+        # Using the starting and ending coordinates of the images, find the pinched edge and use that to find the scaling factor between the original image and the transformed image
+        startingCoordinates, endingCoordinates = self.getStartingEndingCoordinates(cameraPosition, cameraForwardVector)
+        # starting and ending coordinates are in the form of [(x,y), (x,y), (x,y), (x,y), (x,y)]
+        # The pinched edge is the smallest distance between two vertically aligned points in the ending coordinates array, which may vary depending on the angle of the camera
+        # Calculate the height of the pinched edge by finding the distance between the two points
+        # Only need to compare the y coordinates of the points, and only compare two points whose x coordinates are the same
+        pinchedEdgeHeight = 0
+        for i in range(len(endingCoordinates)):
+            for j in range(i + 1, len(endingCoordinates)):
+                if endingCoordinates[i][0] == endingCoordinates[j][0]:
+                    pinchedEdgeHeight = max(pinchedEdgeHeight, abs(endingCoordinates[i][1] - endingCoordinates[j][1]))
+        # The scaling factor is the ratio of the height of the original image to the height of the pinched edge
+        # The height of the original image is the difference between the maximum and minimum y coordinates of the starting coordinates
+        originalImageHeight = max([coord[1] for coord in startingCoordinates]) - min([coord[1] for coord in startingCoordinates])
+        # The scaling factor is the ratio of the original image height to the pinched-edge height
+        scalingFactor = originalImageHeight / pinchedEdgeHeight
+        return scalingFactor
 
 
     def getLeftForwardVectorAndPosition(self):
@@ -39,6 +75,12 @@ class ImageTransformer:
         radians = math.radians(self.rightAngle)
         cameraPosition = (math.cos(radians), math.sin(radians), 0)
         cameraForwardVector = (math.cos(radians), math.sin(radians), 0)
+        return cameraPosition, cameraForwardVector
+
+
+    def getMiddleForwardVectorAndPosition(self):
+        cameraPosition = (0, 0, 0)
+        cameraForwardVector = (1, 0, 0)
         return cameraPosition, cameraForwardVector
 
 
@@ -70,49 +112,16 @@ class ImageTransformer:
 
 
     def stitchImages(self):
-        """Stitch the left, middle, and right images together."""
-        # Get the original image height from imageDimensions
-        original_height = self.imageDimensions[1]
-
-        # Get the dimensions of the transformed images
-        left_height, left_width = self.leftImage.shape[:2]
-        middle_height, middle_width = self.middleImage.shape[:2]
-        right_height, right_width = self.rightImage.shape[:2]
-
-        # Calculate the scale factor to resize the middle image to match the original height
-        # while preserving its aspect ratio
-        scale_factor = original_height / middle_height
-        middle_resized_width = int(middle_width * scale_factor)
-        middle_resized = cv2.resize(self.middleImage, (middle_resized_width, original_height))
-
-        # Create a blank canvas for the middle image with empty space above and below
-        # The height will be the same as the original image
-        middle_canvas = np.zeros((original_height, middle_resized_width, 3), dtype=np.uint8)
-
-        # Calculate the vertical position to place the middle image in the center
-        # If we want to keep the original middle image height and add padding
-        # We'll resize it to a smaller height and place it in the center
-        target_height = middle_height  # Keep the original middle image height
-        scale_factor_height = target_height / original_height
-        middle_small_width = int(middle_resized_width * scale_factor_height)
-        middle_small_height = target_height
-
-        # Resize the middle image to the target height while preserving aspect ratio
-        middle_small = cv2.resize(self.middleImage, (middle_small_width, middle_small_height))
-
-        # Calculate the position to place the small image in the center of the canvas
-        y_offset = (original_height - middle_small_height) // 2
-        x_offset = (middle_resized_width - middle_small_width) // 2
-
-        # Place the small middle image in the center of the canvas
-        middle_canvas[y_offset:y_offset+middle_small_height, x_offset:x_offset+middle_small_width] = middle_small
-
-        # Resize left and right images to match the height of the original image
-        left_resized = cv2.resize(self.leftImage, (int(left_width * (original_height / left_height)), original_height))
-        right_resized = cv2.resize(self.rightImage, (int(right_width * (original_height / right_height)), original_height))
-
-        # Concatenate the resized images
-        return cv2.hconcat([left_resized, middle_canvas, right_resized])
+        leftScalingFactor = self.getScalingFactor(*self.getLeftForwardVectorAndPosition())
+        middleScalingFactor = self.getScalingFactor(*self.getMiddleForwardVectorAndPosition())
+        rightScalingFactor = self.getScalingFactor(*self.getRightForwardVectorAndPosition())
+        # Apply scaling factors to the images
+        leftImage = cv2.resize(self.leftImage, (0, 0), fx=leftScalingFactor, fy=leftScalingFactor)
+        middleImage = cv2.resize(self.middleImage, (0, 0), fx=middleScalingFactor, fy=middleScalingFactor)
+        rightImage = cv2.resize(self.rightImage, (0, 0), fx=rightScalingFactor, fy=rightScalingFactor)
+        # Stitch the images together
+        stitchedImage = cv2.hconcat([leftImage, middleImage, rightImage])
+        return stitchedImage
 
 
     def showStitchedImage(self):

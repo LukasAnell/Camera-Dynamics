@@ -22,7 +22,7 @@ def main():
     # plt.imshow(cv2.cvtColor(imageTransformed, cv2.COLOR_BGR2RGB))
     #
     # plt.show()
-    cameraOffsetDegrees = 30
+    cameraOffsetDegrees = -30
     cameraFocalHeight = 1  # D
     cameraFocalLength = math.sqrt(3)  # F
     projectionPlaneDistanceFromCenter = 10  # δ
@@ -77,7 +77,7 @@ def transformationMatrixMaker(
         cameraFocalLength: float,
         projectionPlaneDistanceFromCenter: float,
         imageDimensions: (int, int) # width, height
-) -> []:
+):
     # first construct camera bounding corners
     focalAngle: float = math.atan(cameraFocalHeight / cameraFocalLength)
     # because we're initially facing in the (1, 0, 0) direction
@@ -286,7 +286,7 @@ def transformationMatrixMaker(
     CD = np.array(finalCDPositions, dtype=np.float32)
 
     transformationMatrix = cv2.getPerspectiveTransform(AB, CD)
-    return transformationMatrix
+    return transformationMatrix, AB, CD
 
 
 if __name__ == '__main__':
