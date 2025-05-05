@@ -26,6 +26,7 @@ def main():
     ImageTransformer.transformLeftImage()
     ImageTransformer.transformMiddleImage()
     ImageTransformer.transformRightImage()
+    ImageTransformer.stitchImages()
     ImageTransformer.saveStitchedImage("stitchedImage.jpg")
     print("hi")
 

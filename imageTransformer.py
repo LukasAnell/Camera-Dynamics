@@ -43,22 +43,23 @@ class ImageTransformer:
         endingCoordinates = transformationMatrix[2]
         return startingCoordinates, endingCoordinates
 
-
-    def getScalingFactor(self, cameraPosition, cameraForwardVector):
+    def getScalingFactor (self, cameraPosition, cameraForwardVector):
         # Using the starting and ending coordinates of the images, find the pinched edge and use that to find the scaling factor between the original image and the transformed image
         startingCoordinates, endingCoordinates = self.getStartingEndingCoordinates(cameraPosition, cameraForwardVector)
         # starting and ending coordinates are in the form of [(x,y), (x,y), (x,y), (x,y), (x,y)]
         # The pinched edge is the smallest distance between two vertically aligned points in the ending coordinates array, which may vary depending on the angle of the camera
         # Calculate the height of the pinched edge by finding the distance between the two points
         # Only need to compare the y coordinates of the points, and only compare two points whose x coordinates are the same
-        pinchedEdgeHeight = 0
+        pinchedEdgeHeight = float('inf')  # Initialize to infinity
         for i in range(len(endingCoordinates)):
             for j in range(i + 1, len(endingCoordinates)):
                 if endingCoordinates[i][0] == endingCoordinates[j][0]:
-                    pinchedEdgeHeight = max(pinchedEdgeHeight, abs(endingCoordinates[i][1] - endingCoordinates[j][1]))
+                    pinchedEdgeHeight = min(pinchedEdgeHeight, abs(endingCoordinates[i][1] - endingCoordinates[j][1]))
         # The scaling factor is the ratio of the height of the original image to the height of the pinched edge
         # The height of the original image is the difference between the maximum and minimum y coordinates of the starting coordinates
-        originalImageHeight = max([coord[1] for coord in startingCoordinates]) - min([coord[1] for coord in startingCoordinates])
+        originalImageHeight = max([coord[1] for coord in startingCoordinates]) - min(
+            [coord[1] for coord in startingCoordinates]
+        )
         # The scaling factor is the ratio of the original image height to the pinched-edge height
         scalingFactor = originalImageHeight / pinchedEdgeHeight
         return scalingFactor
@@ -110,18 +111,56 @@ class ImageTransformer:
         transformationMatrix = self.getTransformationMatrix(cameraPosition, cameraForwardVector)
         self.rightImage = self.applyTransformation(cv2.flip(self.rightImage,1), transformationMatrix)
 
+    def stitchImages (self):
+        """
+        Stitch the left, middle, and right images together.
+        This function:
+        1. Calculates scaling factors for left and right images
+        2. Scales up the left and right images to match the correct height
+        3. Adds black bars to the middle image to match the height of the scaled side images
+        4. Concatenates all three images horizontally
+        """
+        # Get scaling factors for left and right images
+        left_pos, left_fwd = self.getLeftForwardVectorAndPosition()
+        right_pos, right_fwd = self.getRightForwardVectorAndPosition()
 
-    def stitchImages(self):
-        leftScalingFactor = self.getScalingFactor(*self.getLeftForwardVectorAndPosition())
-        middleScalingFactor = self.getScalingFactor(*self.getMiddleForwardVectorAndPosition())
-        rightScalingFactor = self.getScalingFactor(*self.getRightForwardVectorAndPosition())
-        # Apply scaling factors to the images
-        leftImage = cv2.resize(self.leftImage, (0, 0), fx=leftScalingFactor, fy=leftScalingFactor)
-        middleImage = cv2.resize(self.middleImage, (0, 0), fx=middleScalingFactor, fy=middleScalingFactor)
-        rightImage = cv2.resize(self.rightImage, (0, 0), fx=rightScalingFactor, fy=rightScalingFactor)
-        # Stitch the images together
-        stitchedImage = cv2.hconcat([leftImage, middleImage, rightImage])
-        return stitchedImage
+        left_scaling_factor = self.getScalingFactor(left_pos, left_fwd)
+        right_scaling_factor = self.getScalingFactor(right_pos, right_fwd)
+
+        # Get current dimensions of all images
+        left_height, left_width = self.leftImage.shape[:2]
+        middle_height, middle_width = self.middleImage.shape[:2]
+        right_height, right_width = self.rightImage.shape[:2]
+
+        # Scale up the left and right images
+        scaled_left_height = int(left_height * left_scaling_factor)
+        scaled_right_height = int(right_height * right_scaling_factor)
+
+        # Determine the maximum height needed for all images
+        max_height = max(scaled_left_height, scaled_right_height)
+
+        # Resize left and right images to maintain aspect ratio while scaling to the correct height
+        scaled_left_width = int(left_width * (scaled_left_height / left_height))
+        scaled_right_width = int(right_width * (scaled_right_height / right_height))
+
+        scaled_left_image = cv2.resize(self.leftImage, (scaled_left_width, scaled_left_height))
+        scaled_right_image = cv2.resize(self.rightImage, (scaled_right_width, scaled_right_height))
+
+        # Add black bars to the middle image to match the height of the scaled side images
+        # Calculate the padding needed at the top and bottom
+        padding_top = (max_height - middle_height) // 2
+        padding_bottom = max_height - middle_height - padding_top
+
+        # Create a black image with the desired height and same width as middle image
+        padded_middle_image = np.zeros((max_height, middle_width, 3), dtype=np.uint8)
+
+        # Place the middle image in the center of the padded image
+        padded_middle_image[padding_top:padding_top + middle_height, :] = self.middleImage
+
+        # Stitch all three images together horizontally
+        stitched_image = cv2.hconcat([scaled_left_image, padded_middle_image, scaled_right_image])
+
+        return stitched_image
 
 
     def showStitchedImage(self):
