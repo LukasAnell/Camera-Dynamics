@@ -5,9 +5,9 @@ import numpy as np
 
 class ImageTransformer:
     def __init__(self,
-            leftImage: str,
-            middleImage: str,
-            rightImage: str,
+            leftImage: np.ndarray,
+            middleImage: np.ndarray,
+            rightImage: np.ndarray,
             leftAngle: int,
             rightAngle: int,
             cameraFocalHeight: float,

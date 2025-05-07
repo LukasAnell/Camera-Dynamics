@@ -14,9 +14,9 @@ def videoStitcherTest():
     middlePath = ""
     rightPath = ""
     VideoStitcher = videoStitcher.VideoStitcher(
-        leftVideo=cv2.imread(leftPath),
-        middleVideo=cv2.imread(middlePath),
-        rightVideo=cv2.imread(rightPath),
+        leftVideo=leftPath,
+        middleVideo=middlePath,
+        rightVideo=rightPath,
         leftAngle=-30,
         rightAngle=30,
         cameraFocalHeight=1.0,
@@ -28,9 +28,9 @@ def videoStitcherTest():
 
 
 def imageTransformerTest():
-    leftPath = R"Test Outputs\left.jpeg"
-    middlePath = R"Test Outputs\middle.jpeg"
-    rightPath = R"Test Outputs\right.jpeg"
+    leftPath = R"Test Inputs\left.jpeg"
+    middlePath = R"Test Inputs\middle.jpeg"
+    rightPath = R"Test Inputs\right.jpeg"
     # stitchThreeImages([leftPath, middlePath, rightPath], 30)
     # print("hi")
     ImageTransformer = imageTransformer.ImageTransformer(
