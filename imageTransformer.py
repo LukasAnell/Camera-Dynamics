@@ -4,7 +4,17 @@ import cv2
 import numpy as np
 
 class ImageTransformer:
-    def __init__(self, leftImage, middleImage, rightImage, leftAngle, rightAngle, cameraFocalHeight, cameraFocalLength, projectionPlaneDistanceFromCenter, imageDimensions):
+    def __init__(self,
+            leftImage: str,
+            middleImage: str,
+            rightImage: str,
+            leftAngle: int,
+            rightAngle: int,
+            cameraFocalHeight: float,
+            cameraFocalLength: float,
+            projectionPlaneDistanceFromCenter: float,
+            imageDimensions: (int, int)
+    ):
         self.leftImage = leftImage
         self.middleImage = middleImage
         self.rightImage = rightImage
@@ -16,7 +26,10 @@ class ImageTransformer:
         self.imageDimensions = imageDimensions  # (width, height)
 
 
-    def getTransformationMatrix(self, cameraPosition, cameraForwardVector):
+    def getTransformationMatrix(self,
+            cameraPosition,
+            cameraForwardVector
+    ):
         """Generate a transformation matrix for the given camera parameters."""
         return self.transformationMatrixMaker(
             cameraPosition=cameraPosition,
@@ -28,7 +41,10 @@ class ImageTransformer:
         )[0]
 
 
-    def getStartingEndingCoordinates(self, cameraPosition, cameraForwardVector):
+    def getStartingEndingCoordinates(self,
+            cameraPosition,
+            cameraForwardVector
+    ):
         # Can be obtained by using transformationMatrixMaker and storing the 2nd and 3rd elements of the tuple
         transformationMatrix = self.transformationMatrixMaker(
             cameraPosition=cameraPosition,
@@ -42,7 +58,10 @@ class ImageTransformer:
         endingCoordinates = transformationMatrix[2]
         return startingCoordinates, endingCoordinates
 
-    def getScalingFactor (self, cameraPosition, cameraForwardVector):
+    def getScalingFactor(self,
+            cameraPosition,
+            cameraForwardVector
+    ):
         # Using the starting and ending coordinates of the images, find the pinched edge and use that to find the scaling factor between the original image and the transformed image
         startingCoordinates, endingCoordinates = self.getStartingEndingCoordinates(cameraPosition, cameraForwardVector)
         # starting and ending coordinates are in the form of [(x,y), (x,y), (x,y), (x,y), (x,y)]
@@ -84,7 +103,10 @@ class ImageTransformer:
         return cameraPosition, cameraForwardVector
 
 
-    def applyTransformation(self, image, transformationMatrix):
+    def applyTransformation(self,
+            image,
+            transformationMatrix
+    ):
         """Apply the transformation matrix to the given image."""
         return cv2.warpPerspective(image, transformationMatrix, self.imageDimensions)
 
@@ -110,7 +132,7 @@ class ImageTransformer:
         transformationMatrix = self.getTransformationMatrix(cameraPosition, cameraForwardVector)
         self.rightImage = self.applyTransformation(cv2.flip(self.rightImage,1), transformationMatrix)
 
-    def stitchImages (self):
+    def stitchImages(self):
         """
         Stitch the left, middle, and right images together.
         This function:
@@ -170,13 +192,14 @@ class ImageTransformer:
         cv2.destroyAllWindows()
 
 
-    def saveStitchedImage(self, filename):
+    def saveStitchedImage(self,
+            filename
+    ):
         """Save the stitched image to a file."""
         stitchedImage = self.stitchImages()
         cv2.imwrite(filename, stitchedImage)
 
-    def transformationMatrixMaker (
-            self,
+    def transformationMatrixMaker (self,
             cameraPosition: [],
             cameraForwardVector: [],
             cameraFocalHeight: float,
