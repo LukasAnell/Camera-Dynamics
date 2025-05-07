@@ -142,46 +142,46 @@ class ImageTransformer:
         4. Concatenates all three images horizontally
         """
         # Get scaling factors for left and right images
-        left_pos, left_fwd = self.getLeftForwardVectorAndPosition()
-        right_pos, right_fwd = self.getRightForwardVectorAndPosition()
+        leftPos, leftFwd = self.getLeftForwardVectorAndPosition()
+        rightPos, rightFwd = self.getRightForwardVectorAndPosition()
 
-        left_scaling_factor = self.getScalingFactor(left_pos, left_fwd)
-        right_scaling_factor = self.getScalingFactor(right_pos, right_fwd)
+        leftScalingFactor = self.getScalingFactor(leftPos, leftFwd)
+        rightScalingFactor = self.getScalingFactor(rightPos, rightFwd)
 
         # Get current dimensions of all images
-        left_height, left_width = self.leftImage.shape[:2]
-        middle_height, middle_width = self.middleImage.shape[:2]
-        right_height, right_width = self.rightImage.shape[:2]
+        leftHeight, leftWidth = self.leftImage.shape[:2]
+        middleHeight, middleWidth = self.middleImage.shape[:2]
+        rightHeight, rightWidth = self.rightImage.shape[:2]
 
         # Scale up the left and right images
-        scaled_left_height = int(left_height * left_scaling_factor)
-        scaled_right_height = int(right_height * right_scaling_factor)
+        scaledLeftHeight = int(leftHeight * leftScalingFactor)
+        scaledRightHeight = int(rightHeight * rightScalingFactor)
 
         # Determine the maximum height needed for all images
-        max_height = max(scaled_left_height, scaled_right_height)
+        maxHeight = max(scaledLeftHeight, scaledRightHeight)
 
         # Resize left and right images to maintain aspect ratio while scaling to the correct height
-        scaled_left_width = int(left_width * (scaled_left_height / left_height))
-        scaled_right_width = int(right_width * (scaled_right_height / right_height))
+        scaledLeftWidth = int(leftWidth * (scaledLeftHeight / leftHeight))
+        scaledRightWidth = int(rightWidth * (scaledRightHeight / rightHeight))
 
-        scaled_left_image = cv2.resize(self.leftImage, (scaled_left_width, scaled_left_height))
-        scaled_right_image = cv2.resize(self.rightImage, (scaled_right_width, scaled_right_height))
+        scaledLeftImage = cv2.resize(self.leftImage, (scaledLeftWidth, scaledLeftHeight))
+        scaledRightImage = cv2.resize(self.rightImage, (scaledRightWidth, scaledRightHeight))
 
         # Add black bars to the middle image to match the height of the scaled side images
         # Calculate the padding needed at the top and bottom
-        padding_top = (max_height - middle_height) // 2
-        padding_bottom = max_height - middle_height - padding_top
+        paddingTop = (maxHeight - middleHeight) // 2
+        paddingBottom = maxHeight - middleHeight - paddingTop
 
         # Create a black image with the desired height and same width as middle image
-        padded_middle_image = np.zeros((max_height, middle_width, 3), dtype=np.uint8)
+        paddedMiddleImage = np.zeros((maxHeight, middleWidth, 3), dtype=np.uint8)
 
         # Place the middle image in the center of the padded image
-        padded_middle_image[padding_top:padding_top + middle_height, :] = self.middleImage
+        paddedMiddleImage[paddingTop:paddingTop + middleHeight, :] = self.middleImage
 
         # Stitch all three images together horizontally
-        stitched_image = cv2.hconcat([scaled_left_image, padded_middle_image, scaled_right_image])
+        stitchedImage = cv2.hconcat([scaledLeftImage, paddedMiddleImage, scaledRightImage])
 
-        return stitched_image
+        return stitchedImage
 
 
     def showStitchedImage(self):
