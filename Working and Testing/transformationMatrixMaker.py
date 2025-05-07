@@ -39,7 +39,7 @@ def main():
     # plt.figure(figsize=(5, 5))
     # plt.imshow(np.asarray(imageTransformed))
 
-    sourceImage = cv2.imread("test2.jpg")
+    sourceImage = cv2.imread("../Test Outputs/test2.jpg")
     # convert transformationMatrix into a 2x3 matrix
     # transformationMatrix = np.float32(np.reshape(transformationMatrix[:2], (2, 3)))
 
@@ -111,7 +111,6 @@ def transformationMatrixMaker(
     #     finalABPositions += [[a, b]]
     finalABPositions = [[0,0],[1,1],[-1,1],[-1,-1],[1,-1]]
 
-
     # projectedLines = [cameraForwardVector, topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector, bottomRightCornerVector]
     # # print projected lines so that they can be copy pasted into 3D desmos
     # for projectedLineVector in projectedLines:
@@ -153,66 +152,6 @@ def transformationMatrixMaker(
         d = cameraPosition[2] + lineParameter * projectedLineVector[2]
         finalCDPositions += [[c, d]]
 
-
-    # print projected lines so that they can be copied and pasted into 3D desmos
-    # for projectedLineVector in projectedLines:
-    #     print("(t * %.4f, t * %.4f, t * %.4f)" % (projectedLineVector[0], projectedLineVector[1], projectedLineVector[2]))
-    # print()
-
-    # use this to convert the intersection point between the projected line and the focal plane
-    # converting that into a vector, where we can take the bottom 2 coordinates as the image space coordinate
-    # preTransformationPlaneImageSpaceTransformation = np.transpose([
-    #     cameraForwardVector,
-    #     -np.cross(cameraForwardVector, [0, 0, 1]),
-    #     [0, 0, 1]
-    # ])
-    #
-    # finalABPositions = []
-    # for projectedLineVector in projectedLines:
-    #     # get rid of first coordinate to get a and b
-    #     # a is horizontal, b is vertical
-    #     finalABPositions += [np.matmul(preTransformationPlaneImageSpaceTransformation, projectedLineVector)]
-    # cameraSpaceOrigin = projectionPlaneDistanceFromCenter + postTransformationImageCoordinates[0]
-    # worldBoundingBoxCorners = []
-    # for projectedLineVector in projectedLines:
-    #     cornerVectorLineParameter = (cameraForwardVector * cameraPosition - cameraForwardVector * cameraSpaceOrigin) / (cameraForwardVector * projectedLineVector) # t
-    #     cameraBoundingBoxIntersection = cameraPosition + cornerVectorLineParameter * projectedLineVector
-    # finalCDPositions = []
-    # for coordinate in postTransformationImageCoordinates:
-    #     finalCDPositions.append((projectionPlaneDistanceFromCenter, coordinate[0] - postTransformationImageCoordinates[0][0], coordinate[1] - postTransformationImageCoordinates[0][1]))
-
-    # translate all points in AB and CD so that they're centered at the origin
-    # use image dimensions to scale the points
-    #
-    # imageHeight = abs(finalCDPositions[2][1] - finalCDPositions[3][1])
-    # imageResolutionHeight = imageDimensions[1] / imageHeight
-    #
-    # for i in range(len(finalCDPositions)):
-    #     finalCDPositions[i][0] *= imageResolutionHeight
-    #     finalCDPositions[i][1] *= imageResolutionHeight
-    #
-    # CDCenterX = finalCDPositions[1][0]
-    # CDCenterY = finalCDPositions[3][1]
-    #
-    # for i in range(len(finalCDPositions)):
-    #     finalCDPositions[i][0] -= CDCenterX
-    #     finalCDPositions[i][1] -= CDCenterY
-    #
-    # # ABCenter = finalABPositions[3]
-    # # ABTopRightDestination = [finalABPositions[1][0] - ABCenter[0], finalABPositions[1][1] - ABCenter[1]]
-    # # xScalingFactor = finalCDPositions[1][0] / ABTopRightDestination[0]
-    # imageHeight = abs(finalABPositions[1][1] - finalABPositions[4][1])
-    # imageResolutionHeight = imageDimensions[1] / imageHeight
-    #
-    #
-    #
-    # for i in range(len(finalABPositions)):
-    #     finalABPositions[i] = [finalABPositions[i][0] * imageResolutionHeight, finalABPositions[i][1] * imageResolutionHeight]
-    #
-    # ABCenter = finalABPositions[3]
-    # for i in range(len(finalABPositions)):
-    #     finalABPositions[i] = [finalABPositions[i][0] - ABCenter[0], finalABPositions[i][1] - ABCenter[1]]
-
     # Find the minimum x and y values for finalABPositions
     minXAB = min(pos[0] for pos in finalABPositions)
     minYAB = min(pos[1] for pos in finalABPositions)
@@ -253,17 +192,12 @@ def transformationMatrixMaker(
         finalCDPositions[i][0] *= xScalingFactorCD
         finalCDPositions[i][1] *= yScalingFactorCD
 
-
-    for point in finalABPositions[1:]:
-        print("(%.4f, %.4f)" % (point[0], point[1]))
-    print()
-    for point in finalCDPositions[1:]:
-        print("(%.4f, %.4f)" % (point[0], point[1]))
-    print()
-
-
-
-        # finalABPositions[i] = [x * (math.sqrt(projectionPlaneDistanceFromCenter**2 + CDCenter[0]**2 + CDCenter[1]**2) - 1) / (projectionPlaneDistanceFromCenter - 1) for x in finalABPositions[i]]
+    # for point in finalABPositions[1:]:
+    #     print("(%.4f, %.4f)" % (point[0], point[1]))
+    # print()
+    # for point in finalCDPositions[1:]:
+    #     print("(%.4f, %.4f)" % (point[0], point[1]))
+    # print()
 
     finalABPositions = [
         finalABPositions[3],  # top-left

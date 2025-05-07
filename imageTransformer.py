@@ -2,7 +2,6 @@ import math
 
 import cv2
 import numpy as np
-from transformationMatrixMaker import transformationMatrixMaker
 
 class ImageTransformer:
     def __init__(self, leftImage, middleImage, rightImage, leftAngle, rightAngle, cameraFocalHeight, cameraFocalLength, projectionPlaneDistanceFromCenter, imageDimensions):
@@ -19,7 +18,7 @@ class ImageTransformer:
 
     def getTransformationMatrix(self, cameraPosition, cameraForwardVector):
         """Generate a transformation matrix for the given camera parameters."""
-        return transformationMatrixMaker(
+        return self.transformationMatrixMaker(
             cameraPosition=cameraPosition,
             cameraForwardVector=cameraForwardVector,
             cameraFocalHeight=self.cameraFocalHeight,
@@ -31,7 +30,7 @@ class ImageTransformer:
 
     def getStartingEndingCoordinates(self, cameraPosition, cameraForwardVector):
         # Can be obtained by using transformationMatrixMaker and storing the 2nd and 3rd elements of the tuple
-        transformationMatrix = transformationMatrixMaker(
+        transformationMatrix = self.transformationMatrixMaker(
             cameraPosition=cameraPosition,
             cameraForwardVector=cameraForwardVector,
             cameraFocalHeight=self.cameraFocalHeight,
@@ -48,7 +47,7 @@ class ImageTransformer:
         startingCoordinates, endingCoordinates = self.getStartingEndingCoordinates(cameraPosition, cameraForwardVector)
         # starting and ending coordinates are in the form of [(x,y), (x,y), (x,y), (x,y), (x,y)]
         # The pinched edge is the smallest distance between two vertically aligned points in the ending coordinates array, which may vary depending on the angle of the camera
-        # Calculate the height of the pinched edge by finding the distance between the two points
+        # Calculate the height of the pinched edge by fi    nding the distance between the two points
         # Only need to compare the y coordinates of the points, and only compare two points whose x coordinates are the same
         pinchedEdgeHeight = float('inf')  # Initialize to infinity
         for i in range(len(endingCoordinates)):
@@ -175,3 +174,135 @@ class ImageTransformer:
         """Save the stitched image to a file."""
         stitchedImage = self.stitchImages()
         cv2.imwrite(filename, stitchedImage)
+
+    def transformationMatrixMaker (
+            self,
+            cameraPosition: [],
+            cameraForwardVector: [],
+            cameraFocalHeight: float,
+            cameraFocalLength: float,
+            projectionPlaneDistanceFromCenter: float,
+            imageDimensions: (int, int)  # width, height
+    ):
+        # first construct camera bounding corners
+        focalAngle: float = math.atan(cameraFocalHeight / cameraFocalLength)
+        # because we're initially facing in the (1, 0, 0) direction
+        # we already know the vectors on the top and left bounding planes are going
+        # to be expressed as
+        # Camera top plane vector = [cos(focalAngle), 0, sin(focalAngle)]
+        # Camera left plane vector = [cos(focalAngle), sin(focalAngle), 0]
+        cameraPositiveZPlaneVector = [math.cos(focalAngle), 0, math.sin(focalAngle)]  # Fy
+        cameraPositiveYPlaneVector = [math.cos(focalAngle), math.sin(focalAngle), 0]  # Fx
+        # going counterclockwise starting in quadrant 1 from the view of the camera
+        topRightCornerVector = np.array(cameraPositiveYPlaneVector) - 2 * (
+                    np.array(cameraPositiveYPlaneVector) - np.array([math.sqrt(2) / 2, 0, 0])) + (
+                                               np.array(cameraPositiveZPlaneVector) - np.array(
+                                           [math.sqrt(2) / 2, 0, 0]
+                                       ))
+        bottomLeftCornerVector = np.array(cameraPositiveYPlaneVector) - (
+                    np.array(cameraPositiveZPlaneVector) - np.array([math.sqrt(2) / 2, 0, 0]))
+
+        bottomRightCornerVector = np.copy(topRightCornerVector)
+        bottomRightCornerVector[2] = -topRightCornerVector[2]
+        topLeftCornerVector = np.copy(bottomLeftCornerVector)
+        topLeftCornerVector[2] = -bottomLeftCornerVector[2]
+
+        finalABPositions = [[0, 0], [1, 1], [-1, 1], [-1, -1], [1, -1]]
+
+        # compute the angle between cameras
+        # a dot b = |a| * |b| cos(theta)
+        # we are assuming magnitude of a and b are 1
+        angleBetweenCameras = math.acos(np.dot(cameraForwardVector, [1, 0, 0]))
+        if cameraForwardVector[1] < 0:
+            angleBetweenCameras = -angleBetweenCameras
+
+        # construct rotation matrix
+        """
+        cosθ, -sinθ, 0
+        sinθ, cosθ , 0
+        0   , 0    , 1
+        """
+        zRotationMatrix = [
+            [math.cos(angleBetweenCameras), -math.sin(angleBetweenCameras), 0],
+            [math.sin(angleBetweenCameras), math.cos(angleBetweenCameras), 0],
+            [0, 0, 1]
+        ]
+        topRightCornerVector = np.matmul(zRotationMatrix, topRightCornerVector)
+        bottomRightCornerVector = np.matmul(zRotationMatrix, bottomRightCornerVector)
+        bottomLeftCornerVector = np.matmul(zRotationMatrix, bottomLeftCornerVector)
+        topLeftCornerVector = np.matmul(zRotationMatrix, topLeftCornerVector)
+
+        # find intersection with delta plane
+        # lineParameter = (projectionPlaneDistanceFromCenter - cameraPosition[0]) / (cameraForwardVector[0])
+        # sticking everything in an array for convenience
+        projectedLines = [cameraForwardVector, topRightCornerVector, topLeftCornerVector, bottomLeftCornerVector,
+                          bottomRightCornerVector]
+        finalCDPositions = []
+        for projectedLineVector in projectedLines:
+            lineParameter = (projectionPlaneDistanceFromCenter - cameraPosition[0]) / projectedLineVector[0]
+            c = cameraPosition[1] + lineParameter * projectedLineVector[1]
+            d = cameraPosition[2] + lineParameter * projectedLineVector[2]
+            finalCDPositions += [[c, d]]
+
+        # Find the minimum x and y values for finalABPositions
+        minXAB = min(pos[0] for pos in finalABPositions)
+        minYAB = min(pos[1] for pos in finalABPositions)
+
+        # Shift all coordinates in finalABPositions to be within the first quadrant
+        for i in range(len(finalABPositions)):
+            finalABPositions[i][0] -= minXAB
+            finalABPositions[i][1] -= minYAB
+
+        # Find the minimum x and y values for finalCDPositions
+        minXCD = min(pos[0] for pos in finalCDPositions)
+        minYCD = min(pos[1] for pos in finalCDPositions)
+
+        # Shift all coordinates in finalCDPositions to be within the first quadrant
+        for i in range(len(finalCDPositions)):
+            finalCDPositions[i][0] -= minXCD
+            finalCDPositions[i][1] -= minYCD
+
+        # Calculate the scaling factors
+        imageWidth, imageHeight = imageDimensions
+        maxXAB = max(pos[0] for pos in finalABPositions)
+        maxYAB = max(pos[1] for pos in finalABPositions)
+        xScalingFactorAB = imageWidth / maxXAB
+        yScalingFactorAB = imageHeight / maxYAB
+
+        maxXCD = max(pos[0] for pos in finalCDPositions)
+        maxYCD = max(pos[1] for pos in finalCDPositions)
+        xScalingFactorCD = imageWidth / maxXCD
+        yScalingFactorCD = imageHeight / maxYCD
+
+        # Apply the scaling factors to each coordinate in finalABPositions
+        for i in range(len(finalABPositions)):
+            finalABPositions[i][0] *= xScalingFactorAB
+            finalABPositions[i][1] *= yScalingFactorAB
+
+        # Apply the scaling factors to each coordinate in finalCDPositions
+        for i in range(len(finalCDPositions)):
+            finalCDPositions[i][0] *= xScalingFactorCD
+            finalCDPositions[i][1] *= yScalingFactorCD
+
+        finalABPositions = [
+            finalABPositions[3],  # top-left
+            finalABPositions[1],  # top-right
+            finalABPositions[4],  # bottom-right
+            finalABPositions[2]  # bottom-left
+        ]
+
+        finalCDPositions = [
+            finalCDPositions[3],  # top-left
+            finalCDPositions[1],  # top-right
+            finalCDPositions[4],  # bottom-right
+            finalCDPositions[2]  # bottom-left
+        ]
+
+        # use cv2.getPerspectiveTransform to get transformation matrix
+        # AB is the source, CD is the destination
+        # Ensure AB and CD are numpy arrays of type float32 and contain exactly 4 points
+        AB = np.array(finalABPositions, dtype=np.float32)
+        CD = np.array(finalCDPositions, dtype=np.float32)
+
+        transformationMatrix = cv2.getPerspectiveTransform(AB, CD)
+        return transformationMatrix, AB, CD

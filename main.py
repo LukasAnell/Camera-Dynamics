@@ -1,14 +1,13 @@
 import os
 import cv2
-import numpy as np
 from transformationMatrixMaker import *
 import imageTransformer
 
 
 def main():
-    leftPath = R"Test Images\left.jpeg"
-    middlePath = R"Test Images\middle.jpeg"
-    rightPath = R"Test Images\right.jpeg"
+    leftPath = R"Test Outputs\left.jpeg"
+    middlePath = R"Test Outputs\middle.jpeg"
+    rightPath = R"Test Outputs\right.jpeg"
     # stitchThreeImages([leftPath, middlePath, rightPath], 30)
     print("hi")
     ImageTransformer = imageTransformer.ImageTransformer(
@@ -61,13 +60,13 @@ def stitchThreeImages(paths: [], cameraOffsetDegrees):
 
 
 def stitchVideos():
-    path = R"spinning rat.mp4"
+    path = R"Test Outputs/spinning rat.mp4"
 
     fourcc = cv2.VideoWriter.fourcc(*'mp4v')
     # dimensions of video
     width = 402
     height = 360
-    output = cv2.VideoWriter('output.mp4', fourcc, 60.0, (width * 3, height))
+    output = cv2.VideoWriter('Test Outputs/output.mp4', fourcc, 60.0, (width * 3, height))
 
     cap = cv2.VideoCapture(path)
     cap2 = cv2.VideoCapture(path)
@@ -100,7 +99,7 @@ def stitchVideos():
     output.release()
 
     cv2.destroyAllWindows()
-    os.startfile('output.mp4')
+    os.startfile('Test Outputs/output.mp4')
     print("hi")
     return
 
