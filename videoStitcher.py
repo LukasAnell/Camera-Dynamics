@@ -1,5 +1,8 @@
 import cv2
 
+import imageTransformer
+from imageTransformer import ImageTransformer
+
 
 class VideoStitcher:
     def __init__(self,
@@ -43,8 +46,22 @@ class VideoStitcher:
             middleRet, middleFrame = middleCap.read()
             rightRet, rightFrame = rightCap.read()
 
-            allFrames = cv2.hconcat([leftFrame, middleFrame, rightFrame])
-            output.write(allFrames)
+            ImageTransformer = imageTransformer.ImageTransformer(
+                leftImage=leftFrame,
+                middleImage=middleFrame,
+                rightImage=rightFrame,
+                leftAngle=self.leftAngle,
+                rightAngle=self.rightAngle,
+                cameraFocalHeight=self.cameraFocalHeight,
+                cameraFocalLength=self.cameraFocalLength,
+                projectionPlaneDistanceFromCenter=self.projectionPlaneDistanceFromCenter,
+                imageDimensions=self.imageDimensions
+            )
+
+            ImageTransformer.transformLeftImage()
+            ImageTransformer.transformMiddleImage()
+            ImageTransformer.transformRightImage()
+            output.write(ImageTransformer.stitchImages())
 
             if cv2.waitKey(1) & 0xFF == ord('q'):
                 break
