@@ -1,12 +1,13 @@
 import math
-import os
 import cv2
 import imageTransformer
 import videoStitcher
+import videoStitcherUI
 
 
 def main():
-    pass
+    """Launch the Video Stitcher UI application."""
+    videoStitcherUI.main()
 
 
 def videoStitcherTest():

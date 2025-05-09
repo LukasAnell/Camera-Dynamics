@@ -1,8 +1,5 @@
 import cv2
-
 import imageTransformer
-from imageTransformer import ImageTransformer
-
 
 class VideoStitcher:
     def __init__(self,
@@ -27,9 +24,13 @@ class VideoStitcher:
         self.imageDimensions = imageDimensions
 
 
-    def outputStitchedVideo(self, fileName: str):
+    def outputStitchedVideo(self, fileName: str, outputDir: str = "Outputs"):
         fourcc = cv2.VideoWriter.fourcc(*'mp4v')
-        output = cv2.VideoWriter("Outputs/" + fileName + ".mp4", fourcc, 60.0, (self.imageDimensions[0] * 3, self.imageDimensions[1]))
+        # Ensure output directory exists
+        import os
+        if not os.path.exists(outputDir):
+            os.makedirs(outputDir)
+        output = cv2.VideoWriter(os.path.join(outputDir, fileName + ".mp4"), fourcc, 60.0, (self.imageDimensions[0] * 3, self.imageDimensions[1]))
 
         leftCap = cv2.VideoCapture(self.leftVideo)
         middleCap = cv2.VideoCapture(self.middleVideo)
