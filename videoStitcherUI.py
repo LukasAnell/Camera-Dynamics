@@ -26,6 +26,10 @@ class VideoStitcherUI:
         # Camera settings
         self.left_angle = tk.IntVar(value=-30)
         self.right_angle = tk.IntVar(value=30)
+        # User-friendly inputs
+        self.field_of_view_degrees = tk.DoubleVar(value=60)  # Default 60 degrees
+        self.camera_distance_cm = tk.DoubleVar(value=30)  # Default 30 cm
+        # Technical parameters (calculated from user-friendly inputs)
         self.camera_focal_height = tk.DoubleVar(value=1.0)
         self.camera_focal_length = tk.DoubleVar(value=math.sqrt(3))
         self.projection_plane_distance = tk.DoubleVar(value=10)
@@ -48,9 +52,8 @@ class VideoStitcherUI:
         self.help_texts = {
             "left_angle": "How far the left camera is turned inward. For typical setups, use -30 degrees.",
             "right_angle": "How far the right camera is turned inward. For typical setups, use 30 degrees.",
-            "focal_height": "Controls the vertical perspective. For most setups, the default value (1.0) works well.",
-            "focal_length": "Controls the field of view. Higher values create a narrower view, lower values create a wider view.",
-            "projection_plane": "Controls how the videos are stitched together. The default value (10) works for most setups.",
+            "field_of_view": "The camera's field of view in degrees. Most smartphone cameras have a FOV between 60-70 degrees.",
+            "camera_distance": "The physical distance between cameras in centimeters. Measure this on your camera setup.",
             "image_dimensions": "The dimensions of each input video (all should have the same size). Higher values give better quality but take longer to process.",
             "presets": "Quick settings for common camera arrangements. Choose the one that best matches your setup."
         }
@@ -118,36 +121,37 @@ class VideoStitcherUI:
 
         # Left angle
         ttk.Label(settings_frame, text="Left Camera Angle (degrees):").grid(row=1, column=0, sticky=tk.W, pady=5)
-        left_angle_spinbox = ttk.Spinbox(settings_frame, from_=-90, to=90, textvariable=self.left_angle, width=10)
+        left_angle_spinbox = ttk.Spinbox(settings_frame, from_=-90, to=90, textvariable=self.left_angle, width=10,
+                                        command=self._update_camera_diagram)
         left_angle_spinbox.grid(row=1, column=1, padx=5, pady=5)
         ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("left_angle")).grid(row=1, column=2, padx=5, pady=5)
 
         # Right angle
         ttk.Label(settings_frame, text="Right Camera Angle (degrees):").grid(row=2, column=0, sticky=tk.W, pady=5)
-        right_angle_spinbox = ttk.Spinbox(settings_frame, from_=-90, to=90, textvariable=self.right_angle, width=10)
+        right_angle_spinbox = ttk.Spinbox(settings_frame, from_=-90, to=90, textvariable=self.right_angle, width=10,
+                                         command=self._update_camera_diagram)
         right_angle_spinbox.grid(row=2, column=1, padx=5, pady=5)
         ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("right_angle")).grid(row=2, column=2, padx=5, pady=5)
 
-        # Focal height - Always visible
-        ttk.Label(settings_frame, text="Camera Height:").grid(row=3, column=0, sticky=tk.W, pady=5)
-        ttk.Spinbox(settings_frame, from_=0.1, to=10.0, increment=0.1, textvariable=self.camera_focal_height, width=10).grid(row=3, column=1, padx=5, pady=5)
-        ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("focal_height")).grid(row=3, column=2, padx=5, pady=5)
+        # Field of View in degrees - User-friendly input
+        ttk.Label(settings_frame, text="Field of View (degrees):").grid(row=3, column=0, sticky=tk.W, pady=5)
+        field_of_view_spinbox = ttk.Spinbox(settings_frame, from_=30, to=120, increment=1, textvariable=self.field_of_view_degrees, width=10, 
+                                           command=self._calculate_technical_parameters)
+        field_of_view_spinbox.grid(row=3, column=1, padx=5, pady=5)
+        ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("field_of_view")).grid(row=3, column=2, padx=5, pady=5)
 
-        # Focal length - Always visible
-        ttk.Label(settings_frame, text="Field of View:").grid(row=4, column=0, sticky=tk.W, pady=5)
-        ttk.Spinbox(settings_frame, from_=0.1, to=10.0, increment=0.1, textvariable=self.camera_focal_length, width=10).grid(row=4, column=1, padx=5, pady=5)
-        ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("focal_length")).grid(row=4, column=2, padx=5, pady=5)
-
-        # Projection plane distance - Always visible
-        ttk.Label(settings_frame, text="Stitching Distance:").grid(row=5, column=0, sticky=tk.W, pady=5)
-        ttk.Spinbox(settings_frame, from_=1, to=100, increment=1, textvariable=self.projection_plane_distance, width=10).grid(row=5, column=1, padx=5, pady=5)
-        ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("projection_plane")).grid(row=5, column=2, padx=5, pady=5)
+        # Camera Distance in cm - User-friendly input
+        ttk.Label(settings_frame, text="Camera Distance (cm):").grid(row=4, column=0, sticky=tk.W, pady=5)
+        camera_distance_spinbox = ttk.Spinbox(settings_frame, from_=5, to=100, increment=1, textvariable=self.camera_distance_cm, width=10,
+                                             command=self._calculate_technical_parameters)
+        camera_distance_spinbox.grid(row=4, column=1, padx=5, pady=5)
+        ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("camera_distance")).grid(row=4, column=2, padx=5, pady=5)
 
         # Image dimensions - Always visible
-        ttk.Label(settings_frame, text="Input Video Dimensions:").grid(row=6, column=0, sticky=tk.W, pady=5)
+        ttk.Label(settings_frame, text="Input Video Dimensions:").grid(row=5, column=0, sticky=tk.W, pady=5)
 
         dimensions_frame = ttk.Frame(settings_frame)
-        dimensions_frame.grid(row=6, column=1, sticky=tk.W, pady=5)
+        dimensions_frame.grid(row=5, column=1, sticky=tk.W, pady=5)
 
         ttk.Label(dimensions_frame, text="Width:").pack(side=tk.LEFT)
         ttk.Spinbox(dimensions_frame, from_=100, to=10000, textvariable=self.image_width, width=6).pack(side=tk.LEFT, padx=5)
@@ -155,7 +159,7 @@ class VideoStitcherUI:
         ttk.Spinbox(dimensions_frame, from_=100, to=10000, textvariable=self.image_height, width=6).pack(side=tk.LEFT, padx=5)
 
         # Add help button for image dimensions
-        ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("image_dimensions")).grid(row=6, column=2, sticky=tk.W, pady=5)
+        ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("image_dimensions")).grid(row=5, column=2, sticky=tk.W, pady=5)
 
         # Output section
         output_frame = ttk.LabelFrame(main_frame, text="Output Settings", padding="10")
@@ -206,6 +210,30 @@ class VideoStitcherUI:
             self.output_folder.set(folder)
 
 
+    def _calculate_technical_parameters(self):
+        """
+        Calculate technical parameters (focal height, focal length, projection plane distance)
+        based on user-friendly inputs (field of view, camera distance).
+        """
+        # Convert field of view from degrees to radians
+        field_of_view_radians = math.radians(self.field_of_view_degrees.get())
+
+        # Calculate focal length and height to achieve the desired field of view
+        # For a given FOV, the ratio of height to length is tan(FOV/2)
+        # We'll keep focal_length fixed at sqrt(3) and adjust focal_height
+        focal_length = math.sqrt(3)  # Fixed value for consistency
+        focal_height = focal_length * math.tan(field_of_view_radians / 2)
+
+        # Calculate projection plane distance based on camera distance
+        # This is a simplified relationship - we use a scaling factor to convert
+        # from physical distance in cm to the internal projection plane distance
+        projection_plane_distance = self.camera_distance_cm.get() / 3
+
+        # Update the technical parameters
+        self.camera_focal_height.set(focal_height)
+        self.camera_focal_length.set(focal_length)
+        self.projection_plane_distance.set(projection_plane_distance)
+
     def _apply_preset(self):
         """Apply the selected preset configuration."""
         preset = self.preset_var.get()
@@ -213,21 +241,21 @@ class VideoStitcherUI:
         if preset == "Standard (30° separation)":
             self.left_angle.set(-30)
             self.right_angle.set(30)
-            self.camera_focal_height.set(1.0)
-            self.camera_focal_length.set(math.sqrt(3))
-            self.projection_plane_distance.set(10)
+            self.field_of_view_degrees.set(60)  # Common FOV for many cameras
+            self.camera_distance_cm.set(30)  # 30cm between cameras
         elif preset == "Wide (45° separation)":
             self.left_angle.set(-45)
             self.right_angle.set(45)
-            self.camera_focal_height.set(1.0)
-            self.camera_focal_length.set(math.sqrt(3))
-            self.projection_plane_distance.set(10)
+            self.field_of_view_degrees.set(70)  # Wider FOV
+            self.camera_distance_cm.set(40)  # Wider separation
         elif preset == "Narrow (15° separation)":
             self.left_angle.set(-15)
             self.right_angle.set(15)
-            self.camera_focal_height.set(1.0)
-            self.camera_focal_length.set(math.sqrt(3))
-            self.projection_plane_distance.set(10)
+            self.field_of_view_degrees.set(50)  # Narrower FOV
+            self.camera_distance_cm.set(20)  # Closer cameras
+
+        # Calculate the technical parameters based on the user-friendly inputs
+        self._calculate_technical_parameters()
 
         # Update the camera diagram
         self._update_camera_diagram()
@@ -339,6 +367,9 @@ class VideoStitcherUI:
 
     def _preview_stitch(self):
         """Generate a preview of the stitched output using the first frame of each video."""
+        # Ensure technical parameters are calculated from user-friendly inputs
+        self._calculate_technical_parameters()
+
         # Validate inputs
         if not self.left_video_path.get() or not self.middle_video_path.get() or not self.right_video_path.get():
             messagebox.showerror("Error", "Please select all three video files.")
@@ -417,6 +448,9 @@ class VideoStitcherUI:
                 preview_window.destroy()
 
     def _process_videos(self):
+        # Ensure technical parameters are calculated from user-friendly inputs
+        self._calculate_technical_parameters()
+
         # Validate inputs
         if not self.left_video_path.get() or not self.middle_video_path.get() or not self.right_video_path.get():
             messagebox.showerror("Error", "Please select all three video files.")
