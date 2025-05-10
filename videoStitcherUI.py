@@ -3,6 +3,8 @@ import math
 import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
 import cv2
+
+import imageTransformer
 import videoStitcher
 from PIL import Image, ImageTk, ImageDraw
 
@@ -13,8 +15,6 @@ class VideoStitcherUI:
         # Set window to maximized state instead of fixed size
         self.root.state('zoomed')
 
-        # Mode selection
-        self.advanced_mode = tk.BooleanVar(value=False)
 
         # Video file paths
         self.left_video_path = tk.StringVar()
@@ -35,8 +35,6 @@ class VideoStitcherUI:
         # Preset configuration
         self.preset_var = tk.StringVar(value="Standard (30° separation)")
 
-        # Store references to widgets that will be shown/hidden based on mode
-        self.advanced_widgets = []
 
         self._create_widgets()
 
@@ -45,20 +43,6 @@ class VideoStitcherUI:
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # Add mode selector at the top
-        mode_frame = ttk.Frame(main_frame)
-        mode_frame.pack(fill=tk.X, padx=5, pady=5)
-        ttk.Label(mode_frame, text="Mode:").pack(side=tk.LEFT)
-        ttk.Radiobutton(mode_frame, text="Simple", variable=self.advanced_mode, value=False, 
-                        command=self._toggle_mode).pack(side=tk.LEFT, padx=10)
-        ttk.Radiobutton(mode_frame, text="Advanced", variable=self.advanced_mode, value=True, 
-                        command=self._toggle_mode).pack(side=tk.LEFT)
-
-        # Add a help button for mode selection
-        ttk.Button(mode_frame, text="?", width=2, 
-                   command=lambda: messagebox.showinfo("Help: Mode Selection", 
-                                                      "Simple Mode: Shows only essential settings with recommended defaults.\n\n"
-                                                      "Advanced Mode: Provides access to all technical parameters for fine-tuning.")).pack(side=tk.LEFT, padx=10)
 
         # Define help texts for camera settings - more beginner-friendly
         self.help_texts = {
@@ -144,59 +128,34 @@ class VideoStitcherUI:
         right_angle_spinbox.grid(row=2, column=1, padx=5, pady=5)
         ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("right_angle")).grid(row=2, column=2, padx=5, pady=5)
 
-        # Focal height - Advanced setting
-        focal_height_label = ttk.Label(settings_frame, text="Camera Height:")
-        focal_height_label.grid(row=3, column=0, sticky=tk.W, pady=5)
-        focal_height_spinbox = ttk.Spinbox(settings_frame, from_=0.1, to=10.0, increment=0.1, textvariable=self.camera_focal_height, width=10)
-        focal_height_spinbox.grid(row=3, column=1, padx=5, pady=5)
-        focal_height_help = ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("focal_height"))
-        focal_height_help.grid(row=3, column=2, padx=5, pady=5)
+        # Focal height - Always visible
+        ttk.Label(settings_frame, text="Camera Height:").grid(row=3, column=0, sticky=tk.W, pady=5)
+        ttk.Spinbox(settings_frame, from_=0.1, to=10.0, increment=0.1, textvariable=self.camera_focal_height, width=10).grid(row=3, column=1, padx=5, pady=5)
+        ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("focal_height")).grid(row=3, column=2, padx=5, pady=5)
 
-        # Add to advanced widgets list
-        self.advanced_widgets.extend([focal_height_label, focal_height_spinbox, focal_height_help])
+        # Focal length - Always visible
+        ttk.Label(settings_frame, text="Field of View:").grid(row=4, column=0, sticky=tk.W, pady=5)
+        ttk.Spinbox(settings_frame, from_=0.1, to=10.0, increment=0.1, textvariable=self.camera_focal_length, width=10).grid(row=4, column=1, padx=5, pady=5)
+        ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("focal_length")).grid(row=4, column=2, padx=5, pady=5)
 
-        # Focal length - Advanced setting
-        focal_length_label = ttk.Label(settings_frame, text="Field of View:")
-        focal_length_label.grid(row=4, column=0, sticky=tk.W, pady=5)
-        focal_length_spinbox = ttk.Spinbox(settings_frame, from_=0.1, to=10.0, increment=0.1, textvariable=self.camera_focal_length, width=10)
-        focal_length_spinbox.grid(row=4, column=1, padx=5, pady=5)
-        focal_length_help = ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("focal_length"))
-        focal_length_help.grid(row=4, column=2, padx=5, pady=5)
+        # Projection plane distance - Always visible
+        ttk.Label(settings_frame, text="Stitching Distance:").grid(row=5, column=0, sticky=tk.W, pady=5)
+        ttk.Spinbox(settings_frame, from_=1, to=100, increment=1, textvariable=self.projection_plane_distance, width=10).grid(row=5, column=1, padx=5, pady=5)
+        ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("projection_plane")).grid(row=5, column=2, padx=5, pady=5)
 
-        # Add to advanced widgets list
-        self.advanced_widgets.extend([focal_length_label, focal_length_spinbox, focal_length_help])
-
-        # Projection plane distance - Advanced setting
-        proj_plane_label = ttk.Label(settings_frame, text="Stitching Distance:")
-        proj_plane_label.grid(row=5, column=0, sticky=tk.W, pady=5)
-        proj_plane_spinbox = ttk.Spinbox(settings_frame, from_=1, to=100, increment=1, textvariable=self.projection_plane_distance, width=10)
-        proj_plane_spinbox.grid(row=5, column=1, padx=5, pady=5)
-        proj_plane_help = ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("projection_plane"))
-        proj_plane_help.grid(row=5, column=2, padx=5, pady=5)
-
-        # Add to advanced widgets list
-        self.advanced_widgets.extend([proj_plane_label, proj_plane_spinbox, proj_plane_help])
-
-        # Image dimensions - Advanced setting
-        dimensions_label = ttk.Label(settings_frame, text="Output Size:")
-        dimensions_label.grid(row=6, column=0, sticky=tk.W, pady=5)
+        # Image dimensions - Always visible
+        ttk.Label(settings_frame, text="Output Size:").grid(row=6, column=0, sticky=tk.W, pady=5)
 
         dimensions_frame = ttk.Frame(settings_frame)
         dimensions_frame.grid(row=6, column=1, sticky=tk.W, pady=5)
 
         ttk.Label(dimensions_frame, text="Width:").pack(side=tk.LEFT)
-        width_spinbox = ttk.Spinbox(dimensions_frame, from_=100, to=10000, textvariable=self.image_width, width=6)
-        width_spinbox.pack(side=tk.LEFT, padx=5)
+        ttk.Spinbox(dimensions_frame, from_=100, to=10000, textvariable=self.image_width, width=6).pack(side=tk.LEFT, padx=5)
         ttk.Label(dimensions_frame, text="Height:").pack(side=tk.LEFT, padx=(10, 0))
-        height_spinbox = ttk.Spinbox(dimensions_frame, from_=100, to=10000, textvariable=self.image_height, width=6)
-        height_spinbox.pack(side=tk.LEFT, padx=5)
+        ttk.Spinbox(dimensions_frame, from_=100, to=10000, textvariable=self.image_height, width=6).pack(side=tk.LEFT, padx=5)
 
         # Add help button for image dimensions
-        dimensions_help = ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("image_dimensions"))
-        dimensions_help.grid(row=6, column=2, sticky=tk.W, pady=5)
-
-        # Add to advanced widgets list
-        self.advanced_widgets.extend([dimensions_label, dimensions_frame, dimensions_help, width_spinbox, height_spinbox])
+        ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("image_dimensions")).grid(row=6, column=2, sticky=tk.W, pady=5)
 
         # Output section
         output_frame = ttk.LabelFrame(main_frame, text="Output Settings", padding="10")
@@ -222,9 +181,6 @@ class VideoStitcherUI:
         # Process Videos button with default gray color
         ttk.Button(process_frame, text="Process Videos", command=self._process_videos, width=20).pack(side=tk.RIGHT)
 
-        # Initialize UI mode (hide advanced widgets)
-        self._toggle_mode()
-
     def _browse_file(self, path_var):
         filetypes = (
             ('Video files', '*.mp4;*.avi;*.mov;*.mkv'),
@@ -249,31 +205,6 @@ class VideoStitcherUI:
         if folder:
             self.output_folder.set(folder)
 
-    def _toggle_mode(self):
-        """Toggle between simple and advanced mode."""
-        if self.advanced_mode.get():
-            # Show advanced widgets
-            for widget in self.advanced_widgets:
-                try:
-                    # Try to use the widget's original geometry manager
-                    widget_info = widget.grid_info()
-                    if widget_info:  # If it was using grid
-                        widget.grid()
-                    else:  # If it wasn't using grid, try pack
-                        widget.pack()
-                except:
-                    # If there's an error, just ignore it
-                    pass
-        else:
-            # Hide advanced widgets
-            for widget in self.advanced_widgets:
-                try:
-                    widget.grid_remove()
-                except:
-                    try:
-                        widget.pack_forget()
-                    except:
-                        pass
 
     def _apply_preset(self):
         """Apply the selected preset configuration."""
