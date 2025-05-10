@@ -51,7 +51,7 @@ class VideoStitcherUI:
             "focal_height": "Controls the vertical perspective. For most setups, the default value (1.0) works well.",
             "focal_length": "Controls the field of view. Higher values create a narrower view, lower values create a wider view.",
             "projection_plane": "Controls how the videos are stitched together. The default value (10) works for most setups.",
-            "image_dimensions": "The size of the output video. Higher values give better quality but take longer to process.",
+            "image_dimensions": "The dimensions of each input video (all should have the same size). Higher values give better quality but take longer to process.",
             "presets": "Quick settings for common camera arrangements. Choose the one that best matches your setup."
         }
 
@@ -144,7 +144,7 @@ class VideoStitcherUI:
         ttk.Button(settings_frame, text="?", width=2, command=lambda: self._show_help("projection_plane")).grid(row=5, column=2, padx=5, pady=5)
 
         # Image dimensions - Always visible
-        ttk.Label(settings_frame, text="Output Size:").grid(row=6, column=0, sticky=tk.W, pady=5)
+        ttk.Label(settings_frame, text="Input Video Dimensions:").grid(row=6, column=0, sticky=tk.W, pady=5)
 
         dimensions_frame = ttk.Frame(settings_frame)
         dimensions_frame.grid(row=6, column=1, sticky=tk.W, pady=5)
@@ -244,21 +244,33 @@ class VideoStitcherUI:
         image = Image.new("RGB", (width, height), "white")
         draw = ImageDraw.Draw(image)
 
-        # Draw the center line
-        draw.line([(width//2, 0), (width//2, height)], fill="lightgray", width=1)
-
         # Calculate camera positions
         center_x, center_y = width//2, height//2
         camera_radius = 10
-        camera_distance = 50
+        camera_distance = 50  # Distance from center to each camera (radius of semicircle)
 
-        # Draw center camera
-        draw.ellipse([(center_x - camera_radius, center_y - camera_radius), 
-                      (center_x + camera_radius, center_y + camera_radius)], 
+        # Draw the semicircle mount
+        # Draw an arc from -90 to 90 degrees (top half of a circle)
+        # Convert to a polygon for filling
+        semicircle_points = []
+        for angle in range(-90, 91, 5):  # 5 degree steps
+            angle_rad = math.radians(angle)
+            x = center_x + int(camera_distance * math.cos(angle_rad))
+            y = center_y + int(camera_distance * math.sin(angle_rad))
+            semicircle_points.append((x, y))
+
+        # Draw the semicircle mount
+        draw.line(semicircle_points, fill="gray", width=3)
+
+        # Draw center camera (at 0 degrees on the semicircle)
+        center_camera_x = center_x + int(camera_distance * math.cos(0))
+        center_camera_y = center_y + int(camera_distance * math.sin(0))
+        draw.ellipse([(center_camera_x - camera_radius, center_camera_y - camera_radius), 
+                      (center_camera_x + camera_radius, center_camera_y + camera_radius)], 
                      outline="black", fill="lightblue")
-        draw.text((center_x - 15, center_y + camera_radius + 5), "Center", fill="black")
+        draw.text((center_camera_x - 15, center_camera_y + camera_radius + 5), "Center", fill="black")
 
-        # Draw left camera
+        # Draw left camera (positioned on the semicircle based on left angle)
         left_angle_rad = math.radians(self.left_angle.get())
         left_x = center_x + int(camera_distance * math.cos(left_angle_rad))
         left_y = center_y + int(camera_distance * math.sin(left_angle_rad))
@@ -267,7 +279,7 @@ class VideoStitcherUI:
                      outline="black", fill="lightgreen")
         draw.text((left_x - 10, left_y + camera_radius + 5), "Left", fill="black")
 
-        # Draw right camera
+        # Draw right camera (positioned on the semicircle based on right angle)
         right_angle_rad = math.radians(self.right_angle.get())
         right_x = center_x + int(camera_distance * math.cos(right_angle_rad))
         right_y = center_y + int(camera_distance * math.sin(right_angle_rad))
@@ -276,10 +288,23 @@ class VideoStitcherUI:
                      outline="black", fill="lightcoral")
         draw.text((right_x - 10, right_y + camera_radius + 5), "Right", fill="black")
 
-        # Draw lines showing camera angles
-        draw.line([(center_x, center_y), (center_x + 40, center_y)], fill="black", width=2)
-        draw.line([(center_x, center_y), (left_x, left_y)], fill="green", width=2)
-        draw.line([(center_x, center_y), (right_x, right_y)], fill="red", width=2)
+        # Draw lines showing camera viewing directions
+        # Each camera points toward the center of the scene
+        scene_center_x = center_x
+        scene_center_y = center_y  # At the center of the semicircle
+
+        # Draw the scene center point
+        draw.ellipse([(scene_center_x - 2, scene_center_y - 2), 
+                      (scene_center_x + 2, scene_center_y + 2)], 
+                     outline="black", fill="black")
+
+        # Draw viewing direction lines
+        draw.line([(center_camera_x, center_camera_y), (scene_center_x, scene_center_y)], fill="blue", width=1)
+        draw.line([(left_x, left_y), (scene_center_x, scene_center_y)], fill="green", width=1)
+        draw.line([(right_x, right_y), (scene_center_x, scene_center_y)], fill="red", width=1)
+
+        # Add a note about the semicircle mount
+        draw.text((center_x - 70, height - 20), "Cameras mounted on semicircle", fill="black")
 
         # Convert to PhotoImage and update the label
         self.camera_diagram_image = ImageTk.PhotoImage(image)
