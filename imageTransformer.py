@@ -66,7 +66,7 @@ class ImageTransformer:
         startingCoordinates, endingCoordinates = self.getStartingEndingCoordinates(cameraPosition, cameraForwardVector)
         # starting and ending coordinates are in the form of [(x,y), (x,y), (x,y), (x,y), (x,y)]
         # The pinched edge is the smallest distance between two vertically aligned points in the ending coordinates array, which may vary depending on the angle of the camera
-        # Calculate the height of the pinched edge by fi    nding the distance between the two points
+        # Calculate the height of the pinched edge by finding the distance between the two points
         # Only need to compare the y coordinates of the points, and only compare two points whose x coordinates are the same
         pinchedEdgeHeight = float('inf')  # Initialize to infinity
         for i in range(len(endingCoordinates)):

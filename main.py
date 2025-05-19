@@ -8,6 +8,7 @@ import videoStitcherUI
 def main():
     """Launch the Video Stitcher UI application."""
     videoStitcherUI.main()
+    # imageTransformerTest()
 
 
 def videoStitcherTest():
@@ -29,29 +30,35 @@ def videoStitcherTest():
 
 
 def imageTransformerTest():
-    leftPath = R"Test Inputs\left.jpeg"
-    middlePath = R"Test Inputs\middle.jpeg"
-    rightPath = R"Test Inputs\right.jpeg"
+    leftPath = R"Test Inputs\left wall.JPG"
+    middlePath = R"Test Inputs\middle wall.JPG"
+    rightPath = R"Test Inputs\right wall.JPG"
     # stitchThreeImages([leftPath, middlePath, rightPath], 30)
     # print("hi")
     ImageTransformer = imageTransformer.ImageTransformer(
         leftImage=cv2.imread(leftPath),
         middleImage=cv2.imread(middlePath),
         rightImage=cv2.imread(rightPath),
-        leftAngle=-30,
-        rightAngle=30,
+        leftAngle=-20,
+        rightAngle=20,
         cameraFocalHeight=1.0,
-        cameraFocalLength=math.sqrt(3),
+        cameraFocalLength=math.tan(math.radians(24)),
         projectionPlaneDistanceFromCenter=10,
-        imageDimensions=(3024, 4072)  # (width, height)
+        imageDimensions=(6000, 4000)  # (width, height)
     )
     # print("hi")
     ImageTransformer.transformLeftImage()
     ImageTransformer.transformMiddleImage()
     ImageTransformer.transformRightImage()
     ImageTransformer.stitchImages()
-    # ImageTransformer.saveStitchedImage("stitchedImage.jpg")
-    # print("hi")
+    ImageTransformer.saveStitchedImage("stitchedImage.jpg")
+
+    img = cv2.imread("stitchedImage.jpg")
+    height = img.shape[0]
+    img[0 : 4000, :] = (0, 0, 0)
+    img[height - 4000 : height, :] = (0, 0, 0)
+    cv2.imwrite("stitchedImage.jpg", img)
+    print("hi")
 
 
 # def stitchThreeImages(paths: [], cameraOffsetDegrees):
