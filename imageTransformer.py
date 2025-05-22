@@ -199,6 +199,69 @@ class ImageTransformer:
         stitchedImage = self.stitchImages()
         cv2.imwrite(filename, stitchedImage)
 
+
+    def removeOverlap(self):
+        # Get camera positions and forward vectors for all three cameras
+        leftPos, leftFwd = self.getLeftForwardVectorAndPosition()
+        middlePos, middleFwd = self.getMiddleForwardVectorAndPosition()
+        rightPos, rightFwd = self.getRightForwardVectorAndPosition()
+
+        # Get pre-transformation coordinates for all three images
+        _, _, _, leftPreTransCoords = self.transformationMatrixMaker(
+            leftPos, leftFwd, self.cameraFocalHeight, self.cameraFocalLength,
+            self.projectionPlaneDistanceFromCenter, self.imageDimensions
+        )
+
+        _, _, _, middlePreTransCoords = self.transformationMatrixMaker(
+            middlePos, middleFwd, self.cameraFocalHeight, self.cameraFocalLength,
+            self.projectionPlaneDistanceFromCenter, self.imageDimensions
+        )
+
+        _, _, _, rightPreTransCoords = self.transformationMatrixMaker(
+            rightPos, rightFwd, self.cameraFocalHeight, self.cameraFocalLength,
+            self.projectionPlaneDistanceFromCenter, self.imageDimensions
+        )
+
+        leftXMin = min(leftPreTransCoords[0][0], leftPreTransCoords[1][0])
+        leftXMax = max(leftPreTransCoords[2][0], leftPreTransCoords[3][0])
+        middleXMin = min(middlePreTransCoords[0][0], middlePreTransCoords[1][0])
+        middleXMax = max(middlePreTransCoords[2][0], middlePreTransCoords[3][0])
+        rightXMin = min(rightPreTransCoords[0][0], rightPreTransCoords[1][0])
+        rightXMax = max(rightPreTransCoords[2][0], rightPreTransCoords[3][0])
+
+        # Find the overlap area between the left and middle images
+        leftMiddleOverlapXMin = max(leftXMin, middleXMin)
+        leftMiddleOverlapXMax = min(leftXMax, middleXMax)
+        leftMiddleOverlapWidth = max(0, leftMiddleOverlapXMax - leftMiddleOverlapXMin)
+
+        # Find the overlap area between the middle and right images
+        rightMiddleOverlapXMin = max(rightXMin, middleXMin)
+        rightMiddleOverlapXMax = min(rightXMax, middleXMax)
+        rightMiddleOverlapWidth = max(0, rightMiddleOverlapXMax - rightMiddleOverlapXMin)
+
+        # Cut out the overlapped area from the left image
+        if leftMiddleOverlapWidth > 0:
+            leftMiddleOverlapStart = int(leftMiddleOverlapXMin)
+            leftMiddleOverlapEnd = int(leftMiddleOverlapXMax)
+            leftImageHeight, leftImageWidth = self.leftImage.shape[:2]
+            # Create a mask for the overlapped area
+            mask = np.zeros((leftImageHeight, leftImageWidth), dtype=np.uint8)
+            mask[:, leftMiddleOverlapStart:leftMiddleOverlapEnd] = 255
+            # Apply the mask to the left image
+            self.leftImage[mask == 255] = (0, 0, 0)
+
+        # Cut out the overlapped area from the right image
+        if rightMiddleOverlapWidth > 0:
+            rightMiddleOverlapStart = int(rightMiddleOverlapXMin)
+            rightMiddleOverlapEnd = int(rightMiddleOverlapXMax)
+            rightImageHeight, rightImageWidth = self.rightImage.shape[:2]
+            # Create a mask for the overlapped area
+            mask = np.zeros((rightImageHeight, rightImageWidth), dtype=np.uint8)
+            mask[:, rightMiddleOverlapStart:rightMiddleOverlapEnd] = 255
+            # Apply the mask to the right image
+            self.rightImage[mask == 255] = (0, 0, 0)
+
+
     def transformationMatrixMaker (self,
             cameraPosition: [],
             cameraForwardVector: [],
@@ -266,6 +329,7 @@ class ImageTransformer:
             c = cameraPosition[1] + lineParameter * projectedLineVector[1]
             d = cameraPosition[2] + lineParameter * projectedLineVector[2]
             finalCDPositions += [[c, d]]
+        preTransformationCDPositions = finalCDPositions
 
         # Find the minimum x and y values for finalABPositions
         minXAB = min(pos[0] for pos in finalABPositions)
@@ -328,4 +392,6 @@ class ImageTransformer:
         CD = np.array(finalCDPositions, dtype=np.float32)
 
         transformationMatrix = cv2.getPerspectiveTransform(AB, CD)
-        return transformationMatrix, AB, CD
+        # print("AB:\n", AB)
+        # print("CD:\n", CD)
+        return transformationMatrix, AB, CD, preTransformationCDPositions

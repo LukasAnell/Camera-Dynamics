@@ -7,8 +7,9 @@ import videoStitcherUI
 
 def main():
     """Launch the Video Stitcher UI application."""
-    videoStitcherUI.main()
-    # imageTransformerTest()
+    # videoStitcherUI.main()
+    imageTransformerTest()
+    # camera is 0.327m forward from the center
 
 
 def videoStitcherTest():
@@ -50,15 +51,18 @@ def imageTransformerTest():
     ImageTransformer.transformLeftImage()
     ImageTransformer.transformMiddleImage()
     ImageTransformer.transformRightImage()
+
+    # ImageTransformer.removeOverlap()
+    print("hi")
     ImageTransformer.stitchImages()
     ImageTransformer.saveStitchedImage("stitchedImage.jpg")
 
-    img = cv2.imread("stitchedImage.jpg")
-    height = img.shape[0]
-    img[0 : 4000, :] = (0, 0, 0)
-    img[height - 4000 : height, :] = (0, 0, 0)
-    cv2.imwrite("stitchedImage.jpg", img)
-    print("hi")
+    # img = cv2.imread("stitchedImage.jpg")
+    # height = img.shape[0]
+    # img[0 : 4000, :] = (0, 0, 0)
+    # img[height - 4000 : height, :] = (0, 0, 0)
+    # cv2.imwrite("stitchedImage.jpg", img)
+    # print("hi")
 
 
 # def stitchThreeImages(paths: [], cameraOffsetDegrees):
