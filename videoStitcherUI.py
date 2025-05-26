@@ -516,15 +516,6 @@ class VideoStitcherUI:
             # Close progress window
             progressWindow.destroy()
 
-            outputPath = os.path.join(outputDir, self.outputFilename.get() + ".mp4")
-            if os.path.exists(outputPath) and os.path.getsize(outputPath) > 0:
-                messagebox.showinfo("Success", f"Video processing complete. Output saved to {outputPath}")
-                os.startfile(outputPath)
-            else:
-                messagebox.showwarning(
-                    "Warning", f"Processing completed but the output file appears to be invalid or empty."
-                )
-
         except Exception as e:
             # Close progress window
             progressWindow.destroy()
