@@ -33,8 +33,8 @@ class VideoStitcherUI:
         self.cameraFocalHeight = tk.DoubleVar(value=1.0)
         self.cameraFocalLength = tk.DoubleVar(value=math.sqrt(3))
         self.projectionPlaneDistance = tk.DoubleVar(value=10)
-        self.imageWidth = tk.IntVar(value=3024)
-        self.imageHeight = tk.IntVar(value=4072)
+        self.imageWidth = tk.IntVar(value=1920)
+        self.imageHeight = tk.IntVar(value=1080)
 
         # Preset configuration
         self.presetVar = tk.StringVar(value="Standard (30° separation)")
@@ -343,29 +343,11 @@ class VideoStitcherUI:
     def _loadSamples(self):
         """Load sample videos if available."""
         # Check for sample videos in Test Inputs folder
-        sampleDir = "Test Inputs"
-        if os.path.exists(sampleDir):
-            # Look for video files
-            videoFiles = []
-            for file in os.listdir(sampleDir):
-                if file.lower().endswith(('.mp4', '.avi', '.mov', '.mkv')):
-                    videoFiles.append(os.path.join(sampleDir, file))
-                elif file.lower().endswith(('.jpg', '.jpeg', '.png')):
-                    # For testing, we can also use image files
-                    videoFiles.append(os.path.join(sampleDir, file))
-
-            # If we found at least 3 files, use them
-            if len(videoFiles) >= 3:
-                self.leftVideoPath.set(videoFiles[0])
-                self.middleVideoPath.set(videoFiles[1])
-                self.rightVideoPath.set(videoFiles[2])
-                messagebox.showinfo("Samples Loaded", "Sample videos have been loaded successfully.")
-                return
-
-        # If we get here, we couldn't find sample videos
-        messagebox.showinfo("No Samples Found", 
-                           "No sample videos were found in the 'Test Inputs' folder. "
-                           "Please create this folder and add at least 3 video files to use this feature.")
+        self.leftVideoPath.set("C:/Users/Lukas/CodingProjects/Camera-Dynamics/Test Inputs/left.mp4")
+        self.middleVideoPath.set("C:/Users/Lukas/CodingProjects/Camera-Dynamics/Test Inputs/center.mp4")
+        self.rightVideoPath.set("C:/Users/Lukas/CodingProjects/Camera-Dynamics/Test Inputs/right.mp4")
+        messagebox.showinfo("Samples Loaded", "Sample videos have been loaded successfully.")
+        return
 
     def _previewStitch(self):
         """Generate a preview of the stitched output using the first frame of each video."""
@@ -413,6 +395,20 @@ class VideoStitcherUI:
                 cameraFocalLength=self.cameraFocalLength.get(),
                 projectionPlaneDistanceFromCenter=self.projectionPlaneDistance.get(),
                 imageDimensions=(self.imageWidth.get(), self.imageHeight.get())
+            )
+
+            transformationMatrices = transformer.initializeTransformationMatrices()
+            transformer = imageTransformer.ImageTransformer(
+                leftImage=leftFrame,
+                middleImage=middleFrame,
+                rightImage=rightFrame,
+                leftAngle=self.leftAngle.get(),
+                rightAngle=self.rightAngle.get(),
+                cameraFocalHeight=self.cameraFocalHeight.get(),
+                cameraFocalLength=self.cameraFocalLength.get(),
+                projectionPlaneDistanceFromCenter=self.projectionPlaneDistance.get(),
+                imageDimensions=(self.imageWidth.get(), self.imageHeight.get()),
+                transformationMatrices=transformationMatrices
             )
 
             # Transform and stitch the images
@@ -521,7 +517,13 @@ class VideoStitcherUI:
             progressWindow.destroy()
 
             outputPath = os.path.join(outputDir, self.outputFilename.get() + ".mp4")
-            messagebox.showinfo("Success", f"Video processing complete. Output saved to {outputPath}")
+            if os.path.exists(outputPath) and os.path.getsize(outputPath) > 0:
+                messagebox.showinfo("Success", f"Video processing complete. Output saved to {outputPath}")
+                os.startfile(outputPath)
+            else:
+                messagebox.showwarning(
+                    "Warning", f"Processing completed but the output file appears to be invalid or empty."
+                )
 
         except Exception as e:
             # Close progress window

@@ -7,8 +7,8 @@ import videoStitcherUI
 
 def main():
     """Launch the Video Stitcher UI application."""
-    # videoStitcherUI.main()
-    imageTransformerTest()
+    videoStitcherUI.main()
+    # imageTransformerTest()
     # camera is 0.327m forward from the center
 
 

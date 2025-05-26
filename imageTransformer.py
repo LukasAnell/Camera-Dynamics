@@ -13,7 +13,8 @@ class ImageTransformer:
             cameraFocalHeight: float,
             cameraFocalLength: float,
             projectionPlaneDistanceFromCenter: float,
-            imageDimensions: (int, int)
+            imageDimensions: (int, int),
+            transformationMatrices: list = []
     ):
         self.leftImage = leftImage
         self.middleImage = middleImage
@@ -24,6 +25,35 @@ class ImageTransformer:
         self.cameraFocalLength = cameraFocalLength
         self.projectionPlaneDistanceFromCenter = projectionPlaneDistanceFromCenter
         self.imageDimensions = imageDimensions  # (width, height)
+        self.transformationMatrices = transformationMatrices
+
+
+    def setTransformationMatrices(self, transformationMatrices):
+        """Set the transformation matrices for the left, middle, and right images."""
+        self.transformationMatrices = transformationMatrices
+
+
+    # Initialize transformation matrices for left, middle, and right images
+    def initializeTransformationMatrices(self):
+        cameraPosition, cameraForwardVector = self.getLeftForwardVectorAndPosition()
+        leftTransformationMatrix = self.getTransformationMatrix(
+            cameraPosition=cameraPosition,
+            cameraForwardVector=cameraForwardVector
+        )
+        self.transformationMatrices.append(leftTransformationMatrix)
+        cameraPosition, cameraForwardVector = self.getMiddleForwardVectorAndPosition()
+        middleTransformationMatrix = self.getTransformationMatrix(
+            cameraPosition=cameraPosition,
+            cameraForwardVector=cameraForwardVector
+        )
+        self.transformationMatrices.append(middleTransformationMatrix)
+        cameraPosition, cameraForwardVector = self.getRightForwardVectorAndPosition()
+        rightTransformationMatrix = self.getTransformationMatrix(
+            cameraPosition=cameraPosition,
+            cameraForwardVector=cameraForwardVector
+        )
+        self.transformationMatrices.append(rightTransformationMatrix)
+        return self.transformationMatrices
 
 
     def getTransformationMatrix(self,
@@ -114,7 +144,7 @@ class ImageTransformer:
     def transformLeftImage(self):
         cameraPosition, cameraForwardVector = self.getLeftForwardVectorAndPosition()
         """Transform the left image using the transformation matrix."""
-        transformationMatrix = self.getTransformationMatrix(cameraPosition, cameraForwardVector)
+        transformationMatrix = self.transformationMatrices[0]
         self.leftImage = self.applyTransformation(cv2.flip(self.leftImage, 1), transformationMatrix)
 
 
@@ -122,14 +152,14 @@ class ImageTransformer:
         cameraPosition = (0, 0, 0)
         cameraForwardVector = (1, 0, 0)
         """Transform the middle image using the transformation matrix."""
-        transformationMatrix = self.getTransformationMatrix(cameraPosition, cameraForwardVector)
+        transformationMatrix = self.transformationMatrices[1]
         self.middleImage = self.applyTransformation(cv2.flip(self.middleImage, 1), transformationMatrix)
 
 
     def transformRightImage(self):
         cameraPosition, cameraForwardVector = self.getRightForwardVectorAndPosition()
         """Transform the right image using the transformation matrix."""
-        transformationMatrix = self.getTransformationMatrix(cameraPosition, cameraForwardVector)
+        transformationMatrix = self.transformationMatrices[2]
         self.rightImage = self.applyTransformation(cv2.flip(self.rightImage,1), transformationMatrix)
 
     def stitchImages(self):
@@ -160,7 +190,7 @@ class ImageTransformer:
         # Determine the maximum height needed for all images
         maxHeight = max(scaledLeftHeight, scaledRightHeight)
 
-        # Resize left and right images to maintain aspect ratio while scaling to the correct height
+        # Resize left and right images to maintain the aspect ratio while scaling to the correct height
         scaledLeftWidth = int(leftWidth * (scaledLeftHeight / leftHeight))
         scaledRightWidth = int(rightWidth * (scaledRightHeight / rightHeight))
 
@@ -239,27 +269,10 @@ class ImageTransformer:
         rightMiddleOverlapXMax = min(rightXMax, middleXMax)
         rightMiddleOverlapWidth = max(0, rightMiddleOverlapXMax - rightMiddleOverlapXMin)
 
-        # Cut out the overlapped area from the left image
-        if leftMiddleOverlapWidth > 0:
-            leftMiddleOverlapStart = int(leftMiddleOverlapXMin)
-            leftMiddleOverlapEnd = int(leftMiddleOverlapXMax)
-            leftImageHeight, leftImageWidth = self.leftImage.shape[:2]
-            # Create a mask for the overlapped area
-            mask = np.zeros((leftImageHeight, leftImageWidth), dtype=np.uint8)
-            mask[:, leftMiddleOverlapStart:leftMiddleOverlapEnd] = 255
-            # Apply the mask to the left image
-            self.leftImage[mask == 255] = (0, 0, 0)
+        # Find the scaling factors and scale up the overlap areas
+        leftMiddleScalingFactor = self.getScalingFactor(leftPos, leftFwd)
+        rightMiddleScalingFactor = self.getScalingFactor(rightPos, rightFwd)
 
-        # Cut out the overlapped area from the right image
-        if rightMiddleOverlapWidth > 0:
-            rightMiddleOverlapStart = int(rightMiddleOverlapXMin)
-            rightMiddleOverlapEnd = int(rightMiddleOverlapXMax)
-            rightImageHeight, rightImageWidth = self.rightImage.shape[:2]
-            # Create a mask for the overlapped area
-            mask = np.zeros((rightImageHeight, rightImageWidth), dtype=np.uint8)
-            mask[:, rightMiddleOverlapStart:rightMiddleOverlapEnd] = 255
-            # Apply the mask to the right image
-            self.rightImage[mask == 255] = (0, 0, 0)
 
 
     def transformationMatrixMaker (self,
