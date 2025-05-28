@@ -1,5 +1,7 @@
 import cv2
+
 import imageTransformer
+
 
 class VideoStitcher:
     def __init__(self,
@@ -34,38 +36,8 @@ class VideoStitcher:
             return 30.0
         return fps_left
 
-    def _calculateOverlapRegions(self, leftFrame, middleFrame, rightFrame, transformationMatrices):
-        """
-        Calculate the overlap regions from the first frames.
-        Returns the left-middle and middle-right overlap widths.
-        """
-        # Create transformer for these frames
-        transformer = imageTransformer.ImageTransformer(
-            leftImage=leftFrame,
-            middleImage=middleFrame,
-            rightImage=rightFrame,
-            leftAngle=self.leftAngle,
-            rightAngle=self.rightAngle,
-            cameraFocalHeight=self.cameraFocalHeight,
-            cameraFocalLength=self.cameraFocalLength,
-            projectionPlaneDistanceFromCenter=self.projectionPlaneDistanceFromCenter,
-            imageDimensions=self.imageDimensions,
-            transformationMatrices=transformationMatrices
-        )
 
-        # Transform the images
-        transformer.transformLeftImage()
-        transformer.transformMiddleImage()
-        transformer.transformRightImage()
-
-        # Calculate overlap regions
-        leftMiddleOverlap = transformer._findOverlapRegion(transformer.leftImage, transformer.middleImage, "right")
-        middleRightOverlap = transformer._findOverlapRegion(transformer.middleImage, transformer.rightImage, "left")
-
-        return leftMiddleOverlap, middleRightOverlap
-
-    def _processFrame(self, leftFrame, middleFrame, rightFrame, transformationMatrices,
-                      frameNumber=None, fps=None, precomputedOverlap=None):
+    def _processFrame (self, leftFrame, middleFrame, rightFrame, transformationMatrices, frameNumber=None, fps=None):
         """
         Process a single set of frames from the three cameras.
 
@@ -76,12 +48,11 @@ class VideoStitcher:
             transformationMatrices: Pre-computed transformation matrices
             frameNumber: Optional frame number for timestamp overlay
             fps: Optional frames per second for timestamp calculation
-            precomputedOverlap: Tuple of (leftMiddleOverlap, middleRightOverlap)
 
         Returns:
             The transformed and stitched frame
         """
-        # Create transformer for these frames
+        # Create a transformer for these frames
         transformer = imageTransformer.ImageTransformer(
             leftImage=leftFrame,
             middleImage=middleFrame,
@@ -100,8 +71,8 @@ class VideoStitcher:
         transformer.transformMiddleImage()
         transformer.transformRightImage()
 
-        # Stitch the transformed images using pre-computed overlap if available
-        stitchedFrame = transformer.stitchImages(precomputedOverlap)
+        # Stitch the transformed images
+        stitchedFrame = transformer.stitchImages()
 
         # Add timestamp overlay if frame number and fps are provided
         if frameNumber is not None and fps is not None:
@@ -137,9 +108,8 @@ class VideoStitcher:
 
         return stitchedFrame
 
-    def outputStitchedVideo(self, fileName: str, outputDir: str = "Outputs"):
+    def outputStitchedVideo (self, fileName: str, outputDir: str = "Outputs"):
         import os
-        import numpy as np
         from subprocess import Popen, PIPE
 
         if not os.path.exists(outputDir):
@@ -165,7 +135,7 @@ class VideoStitcher:
             print("Error: Could not read frames from one or more videos.")
             return
 
-        # Create transformer and initialize matrices
+        # Create a transformer and initialize matrices
         firstTransformer = imageTransformer.ImageTransformer(
             leftImage=leftFrame,
             middleImage=middleFrame,
@@ -180,23 +150,14 @@ class VideoStitcher:
 
         transformationMatrices = firstTransformer.initializeTransformationMatrices()
 
-        # Pre-compute overlap regions from first frame
-        precomputedOverlap = self._calculateOverlapRegions(
-            leftFrame, middleFrame, rightFrame, transformationMatrices)
-        print(f"Pre-computed overlap regions: {precomputedOverlap}")
-
-        # Process first frame to get dimensions
-        firstFrame = self._processFrame(
-            leftFrame, middleFrame, rightFrame,
-            transformationMatrices,
-            precomputedOverlap=precomputedOverlap
-        )
+        # Process the first frame to get dimensions
+        firstFrame = self._processFrame(leftFrame, middleFrame, rightFrame, transformationMatrices)
 
         # Get original dimensions
         originalHeight, originalWidth = firstFrame.shape[:2]
         print(f"Original stitched dimensions: {originalWidth}x{originalHeight}")
 
-        # Scale down if width exceeds 4K (3840 pixels)
+        # Scale down if the width exceeds 4k (3840 pixels)
         maxWidth = 3840  # 4K width
         if originalWidth > maxWidth:
             scaleFactor = maxWidth / originalWidth
@@ -227,7 +188,7 @@ class VideoStitcher:
             int(rightCap.get(cv2.CAP_PROP_FRAME_COUNT))
         )
 
-        # Set up FFmpeg process with proper dimensions
+        # Set up the FFmpeg process with proper dimensions
         command = [
             'ffmpeg',
             '-y',
@@ -243,7 +204,7 @@ class VideoStitcher:
             outputPath
         ]
 
-        # Start FFmpeg process
+        # Start the FFmpeg process
         process = Popen(command, stdin=PIPE)
 
         print(f"Processing and encoding {totalFrames} frames...")
@@ -262,12 +223,8 @@ class VideoStitcher:
 
                 print(f"Processing frame {frame_count} of {totalFrames}")
 
-                # Process frames with pre-computed overlap
-                processedFrame = self._processFrame(
-                    leftFrame, middleFrame, rightFrame,
-                    transformationMatrices,
-                    precomputedOverlap=precomputedOverlap
-                )
+                # Process frames
+                processedFrame = self._processFrame(leftFrame, middleFrame, rightFrame, transformationMatrices)
 
                 # Resize to the new dimensions
                 processedFrame = cv2.resize(processedFrame, (outputWidth, outputHeight))
@@ -285,7 +242,7 @@ class VideoStitcher:
             middleCap.release()
             rightCap.release()
 
-            # Ensure FFmpeg process is properly closed
+            # Ensure the FFmpeg process is properly closed
             if process.stdin:
                 process.stdin.close()
             process.wait()

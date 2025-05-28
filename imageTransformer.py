@@ -162,11 +162,13 @@ class ImageTransformer:
         transformationMatrix = self.transformationMatrices[2]
         self.rightImage = self.applyTransformation(cv2.flip(self.rightImage,1), transformationMatrix)
 
-    def stitchImages(self, precomputedOverlap=None):
+    def stitchImages (self):
         """
-        Stitch the left, middle, and right images together.
-        If precomputedOverlap is provided, use those values instead of recalculating.
-        precomputedOverlap should be a tuple of (leftMiddleOverlap, middleRightOverlap)
+        Stitch the left, middle, and right images together, removing overlapping regions.
+        This function:
+        1. Scales all three images first
+        2. Then removes overlap regions
+        3. Finally stitches the scaled, cropped images together
         """
         # Get scaling factors for all three images
         leftPos, leftFwd = self.getLeftForwardVectorAndPosition()
@@ -208,13 +210,7 @@ class ImageTransformer:
         self.rightImage = scaledRightImage
 
         # Remove overlap on the scaled images
-        if precomputedOverlap:
-            leftMiddleOverlap, middleRightOverlap = precomputedOverlap
-            croppedLeftImage = self.leftImage
-            croppedRightImage = self.rightImage
-            croppedMiddleImage = self.middleImage[:, leftMiddleOverlap:self.middleImage.shape[1] - middleRightOverlap]
-        else:
-            croppedLeftImage, croppedMiddleImage, croppedRightImage = self.removeOverlap()
+        croppedLeftImage, croppedMiddleImage, croppedRightImage = self.removeOverlap()
 
         # Restore original images
         self.leftImage = originalLeft
