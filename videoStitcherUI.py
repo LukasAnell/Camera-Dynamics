@@ -342,10 +342,14 @@ class VideoStitcherUI:
 
     def _loadSamples(self):
         """Load sample videos if available."""
-        # Check for sample videos in Test Inputs folder
-        self.leftVideoPath.set("C:/Users/Lukas/CodingProjects/Camera-Dynamics/Test Inputs/left.mp4")
-        self.middleVideoPath.set("C:/Users/Lukas/CodingProjects/Camera-Dynamics/Test Inputs/center.mp4")
-        self.rightVideoPath.set("C:/Users/Lukas/CodingProjects/Camera-Dynamics/Test Inputs/right.mp4")
+        import os
+
+        # Get the current script directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        # Create paths relative to the script location
+        self.leftVideoPath.set(os.path.join(script_dir, "Test Inputs", "left.mp4"))
+        self.middleVideoPath.set(os.path.join(script_dir, "Test Inputs", "center.mp4"))
+        self.rightVideoPath.set(os.path.join(script_dir, "Test Inputs", "right.mp4"))
         messagebox.showinfo("Samples Loaded", "Sample videos have been loaded successfully.")
         return
 
@@ -472,12 +476,11 @@ class VideoStitcherUI:
         progressWindow = tk.Toplevel(self.root)
         progressWindow.title("Processing Videos")
         progressWindow.geometry("400x150")
-        progressWindow.transient(self.root)  # Make it float on top of the main window
-        progressWindow.grab_set()  # Make it modal
+        progressWindow.transient(self.root)
+        progressWindow.grab_set()
 
-        # Add progress information
-        ttk.Label(progressWindow, text="Processing videos. This may take several minutes...", 
-                 font=("", 10, "bold")).pack(pady=(20, 10))
+        ttk.Label(progressWindow, text="Processing videos. This may take several minutes...",
+                  font=("", 10, "bold")).pack(pady=(20, 10))
         progress = ttk.Progressbar(progressWindow, orient="horizontal", length=350, mode="indeterminate")
         progress.pack(pady=10, padx=20)
         progress.start()
@@ -486,18 +489,29 @@ class VideoStitcherUI:
         statusLabel = ttk.Label(progressWindow, textvariable=statusVar)
         statusLabel.pack(pady=5)
 
-        # Update the UI
         self.root.update()
 
         try:
-            # Create VideoStitcher instance
+            # Normalize file paths for OpenCV
+            leftPath = os.path.normpath(self.leftVideoPath.get())
+            middlePath = os.path.normpath(self.middleVideoPath.get())
+            rightPath = os.path.normpath(self.rightVideoPath.get())
+
+            # Print paths for debugging
+            print(f"Using video paths: \nLeft: {leftPath}\nMiddle: {middlePath}\nRight: {rightPath}")
+
+            # Verify files exist and are readable
+            for path, name in [(leftPath, "Left"), (middlePath, "Middle"), (rightPath, "Right")]:
+                if not os.path.isfile(path):
+                    raise FileNotFoundError(f"{name} video file not found: {path}")
+
             statusVar.set("Creating video stitcher...")
             progressWindow.update()
 
             videoStitcherObj = videoStitcher.VideoStitcher(
-                leftVideo=self.leftVideoPath.get(),
-                middleVideo=self.middleVideoPath.get(),
-                rightVideo=self.rightVideoPath.get(),
+                leftVideo=leftPath,
+                middleVideo=middlePath,
+                rightVideo=rightPath,
                 leftAngle=self.leftAngle.get(),
                 rightAngle=self.rightAngle.get(),
                 cameraFocalHeight=self.cameraFocalHeight.get(),
@@ -506,20 +520,16 @@ class VideoStitcherUI:
                 imageDimensions=(self.imageWidth.get(), self.imageHeight.get())
             )
 
-            # Process videos
             statusVar.set("Processing and stitching videos...")
             progressWindow.update()
 
-            # Pass both the filename and the output directory to the VideoStitcher
             outputDir = self.outputFolder.get()
             videoStitcherObj.outputStitchedVideo(self.outputFilename.get(), outputDir)
             statusVar.set("Processing complete! Output saved.")
 
-            # Close progress window
             progressWindow.destroy()
 
         except Exception as e:
-            # Close progress window
             progressWindow.destroy()
             messagebox.showerror("Error", f"An error occurred during processing: {str(e)}")
 
