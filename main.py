@@ -47,6 +47,7 @@ def imageTransformerTest():
         projectionPlaneDistanceFromCenter=10,
         imageDimensions=(6000, 4000)  # (width, height)
     )
+    ImageTransformer.initializeTransformationMatrices()
     # print("hi")
     ImageTransformer.transformLeftImage()
     ImageTransformer.transformMiddleImage()

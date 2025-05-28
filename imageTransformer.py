@@ -258,8 +258,9 @@ class ImageTransformer:
 
     def removeOverlap (self):
         """
-        Remove overlap between images by cropping the left and right images.
-        Returns cropped versions of the transformed images.
+        Remove overlap by cropping the middle image on both sides,
+        keeping the side images intact.
+        Returns the original side images and the cropped middle image.
         """
         # Get image dimensions
         leftHeight, leftWidth = self.leftImage.shape[:2]
@@ -270,13 +271,11 @@ class ImageTransformer:
         leftMiddleOverlap = self._findOverlapRegion(self.leftImage, self.middleImage, "right")
         middleRightOverlap = self._findOverlapRegion(self.middleImage, self.rightImage, "left")
 
-        # Crop left image to remove overlap with middle image
-        croppedLeftImage = self.leftImage[:, 0:leftWidth - leftMiddleOverlap]
+        # Crop middle image on both sides to remove overlap
+        croppedMiddleImage = self.middleImage[:, leftMiddleOverlap:middleWidth - middleRightOverlap]
 
-        # Crop right image to remove overlap with middle image
-        croppedRightImage = self.rightImage[:, middleRightOverlap:rightWidth]
-
-        return croppedLeftImage, self.middleImage, croppedRightImage
+        # Return the original side images and the cropped middle image
+        return self.leftImage, croppedMiddleImage, self.rightImage
 
     def _findOverlapRegion (self, img1, img2, side):
         """
