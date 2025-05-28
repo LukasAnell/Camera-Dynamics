@@ -165,45 +165,78 @@ class ImageTransformer:
     def stitchImages (self):
         """
         Stitch the left, middle, and right images together, removing overlapping regions.
+        This function:
+        1. Scales all three images first
+        2. Then removes overlap regions
+        3. Finally stitches the scaled, cropped images together
         """
-        # Remove overlap and get cropped images
-        croppedLeftImage, middleImage, croppedRightImage = self.removeOverlap()
-
-        # Get scaling factors for left and right images
+        # Get scaling factors for all three images
         leftPos, leftFwd = self.getLeftForwardVectorAndPosition()
+        middlePos, middleFwd = self.getMiddleForwardVectorAndPosition()
         rightPos, rightFwd = self.getRightForwardVectorAndPosition()
 
         leftScalingFactor = self.getScalingFactor(leftPos, leftFwd)
+        middleScalingFactor = self.getScalingFactor(middlePos, middleFwd)
         rightScalingFactor = self.getScalingFactor(rightPos, rightFwd)
 
-        # Get dimensions of cropped images
-        leftHeight, leftWidth = croppedLeftImage.shape[:2]
-        middleHeight, middleWidth = middleImage.shape[:2]
-        rightHeight, rightWidth = croppedRightImage.shape[:2]
+        # Get current dimensions of all images
+        leftHeight, leftWidth = self.leftImage.shape[:2]
+        middleHeight, middleWidth = self.middleImage.shape[:2]
+        rightHeight, rightWidth = self.rightImage.shape[:2]
 
-        # Scale up the left and right images
+        # Scale all three images
         scaledLeftHeight = int(leftHeight * leftScalingFactor)
+        scaledMiddleHeight = int(middleHeight * middleScalingFactor)
         scaledRightHeight = int(rightHeight * rightScalingFactor)
 
-        # Determine the maximum height needed
-        maxHeight = max(scaledLeftHeight, middleHeight, scaledRightHeight)
-
-        # Resize left and right images to maintain aspect ratio
+        # Resize to maintain aspect ratio
         scaledLeftWidth = int(leftWidth * (scaledLeftHeight / leftHeight))
+        scaledMiddleWidth = int(middleWidth * (scaledMiddleHeight / middleHeight))
         scaledRightWidth = int(rightWidth * (scaledRightHeight / rightHeight))
 
-        scaledLeftImage = cv2.resize(croppedLeftImage, (scaledLeftWidth, scaledLeftHeight))
-        scaledRightImage = cv2.resize(croppedRightImage, (scaledRightWidth, scaledRightHeight))
+        # Create scaled versions of the images
+        scaledLeftImage = cv2.resize(self.leftImage, (scaledLeftWidth, scaledLeftHeight))
+        scaledMiddleImage = cv2.resize(self.middleImage, (scaledMiddleWidth, scaledMiddleHeight))
+        scaledRightImage = cv2.resize(self.rightImage, (scaledRightWidth, scaledRightHeight))
 
-        # Add padding to middle image to match height
-        paddingTop = (maxHeight - middleHeight) // 2
-        paddingBottom = maxHeight - middleHeight - paddingTop
+        # Store original images
+        originalLeft = self.leftImage.copy()
+        originalMiddle = self.middleImage.copy()
+        originalRight = self.rightImage.copy()
 
-        paddedMiddleImage = np.zeros((maxHeight, middleWidth, 3), dtype=np.uint8)
-        paddedMiddleImage[paddingTop:paddingTop + middleHeight, :] = middleImage
+        # Temporarily replace the images with their scaled versions
+        self.leftImage = scaledLeftImage
+        self.middleImage = scaledMiddleImage
+        self.rightImage = scaledRightImage
+
+        # Remove overlap on the scaled images
+        croppedLeftImage, croppedMiddleImage, croppedRightImage = self.removeOverlap()
+
+        # Restore original images
+        self.leftImage = originalLeft
+        self.middleImage = originalMiddle
+        self.rightImage = originalRight
+
+        # Determine the maximum height needed
+        maxHeight = max(scaledLeftHeight, scaledMiddleHeight, scaledRightHeight)
+
+        # Add padding to center images vertically if needed
+        paddedLeftImage = np.zeros((maxHeight, croppedLeftImage.shape[1], 3), dtype=np.uint8)
+        paddedMiddleImage = np.zeros((maxHeight, croppedMiddleImage.shape[1], 3), dtype=np.uint8)
+        paddedRightImage = np.zeros((maxHeight, croppedRightImage.shape[1], 3), dtype=np.uint8)
+
+        # Center images vertically
+        paddingTopLeft = (maxHeight - croppedLeftImage.shape[0]) // 2
+        paddingTopMiddle = (maxHeight - croppedMiddleImage.shape[0]) // 2
+        paddingTopRight = (maxHeight - croppedRightImage.shape[0]) // 2
+
+        # Place the cropped, scaled images into padded frames
+        paddedLeftImage[paddingTopLeft:paddingTopLeft + croppedLeftImage.shape[0], :] = croppedLeftImage
+        paddedMiddleImage[paddingTopMiddle:paddingTopMiddle + croppedMiddleImage.shape[0], :] = croppedMiddleImage
+        paddedRightImage[paddingTopRight:paddingTopRight + croppedRightImage.shape[0], :] = croppedRightImage
 
         # Concatenate all images horizontally
-        stitchedImage = cv2.hconcat([scaledLeftImage, paddedMiddleImage, scaledRightImage])
+        stitchedImage = cv2.hconcat([paddedLeftImage, paddedMiddleImage, paddedRightImage])
 
         return stitchedImage
 

@@ -158,12 +158,20 @@ class VideoStitcher:
                 ImageTransformer.transformLeftImage()
                 ImageTransformer.transformMiddleImage()
                 ImageTransformer.transformRightImage()
-                output.write(ImageTransformer.stitchImages())
+
+                # Write the stitched image to the output video
+                # if not output.isOpened():
+                #     print(f"Warning: Output video writer not opened at frame {frameNumber}. Trying to reopen.")
+                #     output = cv2.VideoWriter(outputPath, fourcc, fps, (outputWidth, outputHeight))
+                #     if not output.isOpened():
+                #         raise Exception(f"Failed to reopen output video writer at frame {frameNumber}")
+                stitchedFrame = ImageTransformer.stitchImages()
+                output.write(stitchedFrame)
+                frameNumber += 1
 
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     break
 
-                frameNumber += 1
         finally:
             print(f"Finished processing {frameNumber} frames.")
             leftCap.release()
