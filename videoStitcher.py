@@ -34,8 +34,38 @@ class VideoStitcher:
             return 30.0
         return fps_left
 
+    def _calculateOverlapRegions(self, leftFrame, middleFrame, rightFrame, transformationMatrices):
+        """
+        Calculate the overlap regions from the first frames.
+        Returns the left-middle and middle-right overlap widths.
+        """
+        # Create transformer for these frames
+        transformer = imageTransformer.ImageTransformer(
+            leftImage=leftFrame,
+            middleImage=middleFrame,
+            rightImage=rightFrame,
+            leftAngle=self.leftAngle,
+            rightAngle=self.rightAngle,
+            cameraFocalHeight=self.cameraFocalHeight,
+            cameraFocalLength=self.cameraFocalLength,
+            projectionPlaneDistanceFromCenter=self.projectionPlaneDistanceFromCenter,
+            imageDimensions=self.imageDimensions,
+            transformationMatrices=transformationMatrices
+        )
 
-    def _processFrame (self, leftFrame, middleFrame, rightFrame, transformationMatrices, frameNumber=None, fps=None):
+        # Transform the images
+        transformer.transformLeftImage()
+        transformer.transformMiddleImage()
+        transformer.transformRightImage()
+
+        # Calculate overlap regions
+        leftMiddleOverlap = transformer._findOverlapRegion(transformer.leftImage, transformer.middleImage, "right")
+        middleRightOverlap = transformer._findOverlapRegion(transformer.middleImage, transformer.rightImage, "left")
+
+        return leftMiddleOverlap, middleRightOverlap
+
+    def _processFrame(self, leftFrame, middleFrame, rightFrame, transformationMatrices,
+                      frameNumber=None, fps=None, precomputedOverlap=None):
         """
         Process a single set of frames from the three cameras.
 
@@ -46,6 +76,7 @@ class VideoStitcher:
             transformationMatrices: Pre-computed transformation matrices
             frameNumber: Optional frame number for timestamp overlay
             fps: Optional frames per second for timestamp calculation
+            precomputedOverlap: Tuple of (leftMiddleOverlap, middleRightOverlap)
 
         Returns:
             The transformed and stitched frame
@@ -69,8 +100,8 @@ class VideoStitcher:
         transformer.transformMiddleImage()
         transformer.transformRightImage()
 
-        # Stitch the transformed images
-        stitchedFrame = transformer.stitchImages()
+        # Stitch the transformed images using pre-computed overlap if available
+        stitchedFrame = transformer.stitchImages(precomputedOverlap)
 
         # Add timestamp overlay if frame number and fps are provided
         if frameNumber is not None and fps is not None:
@@ -106,9 +137,8 @@ class VideoStitcher:
 
         return stitchedFrame
 
-    def outputStitchedVideo (self, fileName: str, outputDir: str = "Outputs"):
+    def outputStitchedVideo(self, fileName: str, outputDir: str = "Outputs"):
         import os
-        import ffmpeg
         import numpy as np
         from subprocess import Popen, PIPE
 
@@ -150,8 +180,17 @@ class VideoStitcher:
 
         transformationMatrices = firstTransformer.initializeTransformationMatrices()
 
+        # Pre-compute overlap regions from first frame
+        precomputedOverlap = self._calculateOverlapRegions(
+            leftFrame, middleFrame, rightFrame, transformationMatrices)
+        print(f"Pre-computed overlap regions: {precomputedOverlap}")
+
         # Process first frame to get dimensions
-        firstFrame = self._processFrame(leftFrame, middleFrame, rightFrame, transformationMatrices)
+        firstFrame = self._processFrame(
+            leftFrame, middleFrame, rightFrame,
+            transformationMatrices,
+            precomputedOverlap=precomputedOverlap
+        )
 
         # Get original dimensions
         originalHeight, originalWidth = firstFrame.shape[:2]
@@ -223,8 +262,12 @@ class VideoStitcher:
 
                 print(f"Processing frame {frame_count} of {totalFrames}")
 
-                # Process frames
-                processedFrame = self._processFrame(leftFrame, middleFrame, rightFrame, transformationMatrices)
+                # Process frames with pre-computed overlap
+                processedFrame = self._processFrame(
+                    leftFrame, middleFrame, rightFrame,
+                    transformationMatrices,
+                    precomputedOverlap=precomputedOverlap
+                )
 
                 # Resize to the new dimensions
                 processedFrame = cv2.resize(processedFrame, (outputWidth, outputHeight))
