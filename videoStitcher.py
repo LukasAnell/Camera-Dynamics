@@ -108,29 +108,34 @@ class VideoStitcher:
 
     def outputStitchedVideo (self, fileName: str, outputDir: str = "Outputs"):
         import os
+        import ffmpeg
+        import numpy as np
+        from subprocess import Popen, PIPE
+
         if not os.path.exists(outputDir):
             os.makedirs(outputDir)
 
-        outputPath = os.path.join(outputDir, f"{fileName}")
+        outputPath = os.path.join(outputDir, f"{fileName}.mp4")
 
         # Initialize video captures
         leftCap = cv2.VideoCapture(self.leftVideo)
         middleCap = cv2.VideoCapture(self.middleVideo)
         rightCap = cv2.VideoCapture(self.rightVideo)
 
-        # Get frame rate from source video
+        # Get frame rate
         fps = self.getCommonFrameRate()
         print(f"Source video frame rate: {fps} fps")
 
-        # Read first frames to determine actual output dimensions
+        # Get first frames to calculate dimensions
         leftRet, leftFrame = leftCap.read()
         middleRet, middleFrame = middleCap.read()
         rightRet, rightFrame = rightCap.read()
 
         if not (leftRet and middleRet and rightRet):
-            raise ValueError("Failed to read first frame from one or more videos")
+            print("Error: Could not read frames from one or more videos.")
+            return
 
-        # Create transformer and initialize transformation matrices
+        # Create transformer and initialize matrices
         firstTransformer = imageTransformer.ImageTransformer(
             leftImage=leftFrame,
             middleImage=middleFrame,
@@ -147,7 +152,27 @@ class VideoStitcher:
 
         # Process first frame to get dimensions
         firstFrame = self._processFrame(leftFrame, middleFrame, rightFrame, transformationMatrices)
-        outputHeight, outputWidth = firstFrame.shape[:2]
+
+        # Get original dimensions
+        originalHeight, originalWidth = firstFrame.shape[:2]
+        print(f"Original stitched dimensions: {originalWidth}x{originalHeight}")
+
+        # Scale down if width exceeds 4K (3840 pixels)
+        maxWidth = 3840  # 4K width
+        if originalWidth > maxWidth:
+            scaleFactor = maxWidth / originalWidth
+            outputWidth = maxWidth
+            outputHeight = int(originalHeight * scaleFactor)
+        else:
+            outputWidth, outputHeight = originalWidth, originalHeight
+
+        # Ensure dimensions are even (required by H.264)
+        if outputWidth % 2 != 0:
+            outputWidth -= 1
+        if outputHeight % 2 != 0:
+            outputHeight -= 1
+
+        print(f"Final output dimensions: {outputWidth}x{outputHeight}")
 
         # Reset video captures
         leftCap.release()
@@ -157,84 +182,70 @@ class VideoStitcher:
         middleCap = cv2.VideoCapture(self.middleVideo)
         rightCap = cv2.VideoCapture(self.rightVideo)
 
-        # Try different codecs in order of preference
-        codec_options = [
-            ('MJPG', '.avi'),  # Motion JPEG
-            ('XVID', '.avi'),  # XVID codec in AVI container b
-            ('mp4v', '.mp4'),  # MP4 with H.264 codec
-            ('avc1', '.mp4'),  # Another variation of H.264
-            ('WMV2', '.wmv')  # Windows Media Video
-        ]
-
-        # Try each codec until one works
-        output = None
-        used_codec = None
-        file_ext = None
-
-        for codec, ext in codec_options:
-            file_path = outputPath + ext
-            fourcc = cv2.VideoWriter_fourcc(*codec)
-            temp_output = cv2.VideoWriter(file_path, fourcc, fps, (outputWidth, outputHeight))
-
-            if temp_output.isOpened():
-                output = temp_output
-                used_codec = codec
-                file_ext = ext
-                break
-
-        if output is None or not output.isOpened():
-            raise Exception(f"Could not open video writer with any of the available codecs.")
-
-        print(f"Using codec: {used_codec} with container: {file_ext}")
-
-        if not output.isOpened():
-            raise Exception(f"Failed to create output video file")
-
         totalFrames = min(
             int(leftCap.get(cv2.CAP_PROP_FRAME_COUNT)),
             int(middleCap.get(cv2.CAP_PROP_FRAME_COUNT)),
             int(rightCap.get(cv2.CAP_PROP_FRAME_COUNT))
         )
 
-        # PHASE 1: Process all frames first and store them
-        print("Phase 1: Processing all frames...")
-        processedFrames = []
-        for frameNumber in range(totalFrames):
-            print(f"Processing frame {frameNumber} of {totalFrames}")
+        # Set up FFmpeg process with proper dimensions
+        command = [
+            'ffmpeg',
+            '-y',
+            '-f', 'rawvideo',
+            '-vcodec', 'rawvideo',
+            '-s', f'{outputWidth}x{outputHeight}',  # Use the new dimensions
+            '-pix_fmt', 'bgr24',
+            '-r', str(fps),
+            '-i', 'fd:',
+            '-c:v', 'libx264',
+            '-preset', 'medium',
+            '-crf', '23',
+            outputPath
+        ]
 
-            leftRet, leftFrame = leftCap.read()
-            middleRet, middleFrame = middleCap.read()
-            rightRet, rightFrame = rightCap.read()
+        # Start FFmpeg process
+        process = Popen(command, stdin=PIPE)
 
-            if not (leftRet and middleRet and rightRet):
-                print(f"End of video reached at frame {frameNumber}")
-                break
+        print(f"Processing and encoding {totalFrames} frames...")
+        frame_count = 0
 
-            if leftFrame is None or middleFrame is None or rightFrame is None:
-                print(f"One of the frames is None at frame {frameNumber}. Skipping.")
-                continue
+        try:
+            while True:
+                # Read frames from each video
+                leftRet, leftFrame = leftCap.read()
+                middleRet, middleFrame = middleCap.read()
+                rightRet, rightFrame = rightCap.read()
 
-            # Process the frame using our helper method
-            stitchedFrame = self._processFrame(
-                leftFrame, middleFrame, rightFrame,
-                transformationMatrices, frameNumber, fps
-            )
+                # Break if any video ends
+                if not (leftRet and middleRet and rightRet):
+                    break
 
-            # Store the processed frame
-            processedFrames.append(stitchedFrame)
+                print(f"Processing frame {frame_count} of {totalFrames}")
 
-        # PHASE 2: Write all frames at the correct FPS
-        print(f"Phase 2: Writing {len(processedFrames)} frames to output video...")
-        for i, frame in enumerate(processedFrames):
-            # Write the frame
-            if frame is None:
-                print(f"Frame {i} is None, skipping write.")
-                continue
-            output.write(frame)
+                # Process frames
+                processedFrame = self._processFrame(leftFrame, middleFrame, rightFrame, transformationMatrices)
 
-        # Clean up
-        leftCap.release()
-        middleCap.release()
-        rightCap.release()
-        output.release()
-        print(f"Video successfully saved to {outputPath + file_ext}")
+                # Resize to the new dimensions
+                processedFrame = cv2.resize(processedFrame, (outputWidth, outputHeight))
+
+                # Write frame to FFmpeg process
+                process.stdin.write(processedFrame.tobytes())
+
+                frame_count += 1
+                if frame_count >= totalFrames:
+                    break
+
+        finally:
+            # Clean up resources
+            leftCap.release()
+            middleCap.release()
+            rightCap.release()
+
+            # Ensure FFmpeg process is properly closed
+            if process.stdin:
+                process.stdin.close()
+            process.wait()
+
+            print(f"Video successfully saved to {outputPath}")
+            print(f"Processed and encoded {frame_count} frames")
