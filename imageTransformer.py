@@ -162,15 +162,13 @@ class ImageTransformer:
         transformationMatrix = self.transformationMatrices[2]
         self.rightImage = self.applyTransformation(cv2.flip(self.rightImage,1), transformationMatrix)
 
-    def stitchImages(self):
+    def stitchImages (self):
         """
-        Stitch the left, middle, and right images together.
-        This function:
-        1. Calculates scaling factors for left and right images
-        2. Scales up the left and right images to match the correct height
-        3. Adds black bars to the middle image to match the height of the scaled side images
-        4. Concatenates all three images horizontally
+        Stitch the left, middle, and right images together, removing overlapping regions.
         """
+        # Remove overlap and get cropped images
+        croppedLeftImage, middleImage, croppedRightImage = self.removeOverlap()
+
         # Get scaling factors for left and right images
         leftPos, leftFwd = self.getLeftForwardVectorAndPosition()
         rightPos, rightFwd = self.getRightForwardVectorAndPosition()
@@ -178,37 +176,33 @@ class ImageTransformer:
         leftScalingFactor = self.getScalingFactor(leftPos, leftFwd)
         rightScalingFactor = self.getScalingFactor(rightPos, rightFwd)
 
-        # Get current dimensions of all images
-        leftHeight, leftWidth = self.leftImage.shape[:2]
-        middleHeight, middleWidth = self.middleImage.shape[:2]
-        rightHeight, rightWidth = self.rightImage.shape[:2]
+        # Get dimensions of cropped images
+        leftHeight, leftWidth = croppedLeftImage.shape[:2]
+        middleHeight, middleWidth = middleImage.shape[:2]
+        rightHeight, rightWidth = croppedRightImage.shape[:2]
 
         # Scale up the left and right images
         scaledLeftHeight = int(leftHeight * leftScalingFactor)
         scaledRightHeight = int(rightHeight * rightScalingFactor)
 
-        # Determine the maximum height needed for all images
-        maxHeight = max(scaledLeftHeight, scaledRightHeight)
+        # Determine the maximum height needed
+        maxHeight = max(scaledLeftHeight, middleHeight, scaledRightHeight)
 
-        # Resize left and right images to maintain the aspect ratio while scaling to the correct height
+        # Resize left and right images to maintain aspect ratio
         scaledLeftWidth = int(leftWidth * (scaledLeftHeight / leftHeight))
         scaledRightWidth = int(rightWidth * (scaledRightHeight / rightHeight))
 
-        scaledLeftImage = cv2.resize(self.leftImage, (scaledLeftWidth, scaledLeftHeight))
-        scaledRightImage = cv2.resize(self.rightImage, (scaledRightWidth, scaledRightHeight))
+        scaledLeftImage = cv2.resize(croppedLeftImage, (scaledLeftWidth, scaledLeftHeight))
+        scaledRightImage = cv2.resize(croppedRightImage, (scaledRightWidth, scaledRightHeight))
 
-        # Add black bars to the middle image to match the height of the scaled side images
-        # Calculate the padding needed at the top and bottom
+        # Add padding to middle image to match height
         paddingTop = (maxHeight - middleHeight) // 2
         paddingBottom = maxHeight - middleHeight - paddingTop
 
-        # Create a black image with the desired height and same width as middle image
         paddedMiddleImage = np.zeros((maxHeight, middleWidth, 3), dtype=np.uint8)
+        paddedMiddleImage[paddingTop:paddingTop + middleHeight, :] = middleImage
 
-        # Place the middle image in the center of the padded image
-        paddedMiddleImage[paddingTop:paddingTop + middleHeight, :] = self.middleImage
-
-        # Stitch all three images together horizontally
+        # Concatenate all images horizontally
         stitchedImage = cv2.hconcat([scaledLeftImage, paddedMiddleImage, scaledRightImage])
 
         return stitchedImage
@@ -229,50 +223,96 @@ class ImageTransformer:
         stitchedImage = self.stitchImages()
         cv2.imwrite(filename, stitchedImage)
 
+    def removeOverlap (self):
+        """
+        Remove overlap between images by cropping the left and right images.
+        Returns cropped versions of the transformed images.
+        """
+        # Get image dimensions
+        leftHeight, leftWidth = self.leftImage.shape[:2]
+        middleHeight, middleWidth = self.middleImage.shape[:2]
+        rightHeight, rightWidth = self.rightImage.shape[:2]
 
-    def removeOverlap(self):
-        # Get camera positions and forward vectors for all three cameras
-        leftPos, leftFwd = self.getLeftForwardVectorAndPosition()
-        middlePos, middleFwd = self.getMiddleForwardVectorAndPosition()
-        rightPos, rightFwd = self.getRightForwardVectorAndPosition()
+        # Find overlap between left-middle and middle-right
+        leftMiddleOverlap = self._findOverlapRegion(self.leftImage, self.middleImage, "right")
+        middleRightOverlap = self._findOverlapRegion(self.middleImage, self.rightImage, "left")
 
-        # Get pre-transformation coordinates for all three images
-        _, _, _, leftPreTransCoords = self.transformationMatrixMaker(
-            leftPos, leftFwd, self.cameraFocalHeight, self.cameraFocalLength,
-            self.projectionPlaneDistanceFromCenter, self.imageDimensions
-        )
+        # Crop left image to remove overlap with middle image
+        croppedLeftImage = self.leftImage[:, 0:leftWidth - leftMiddleOverlap]
 
-        _, _, _, middlePreTransCoords = self.transformationMatrixMaker(
-            middlePos, middleFwd, self.cameraFocalHeight, self.cameraFocalLength,
-            self.projectionPlaneDistanceFromCenter, self.imageDimensions
-        )
+        # Crop right image to remove overlap with middle image
+        croppedRightImage = self.rightImage[:, middleRightOverlap:rightWidth]
 
-        _, _, _, rightPreTransCoords = self.transformationMatrixMaker(
-            rightPos, rightFwd, self.cameraFocalHeight, self.cameraFocalLength,
-            self.projectionPlaneDistanceFromCenter, self.imageDimensions
-        )
+        return croppedLeftImage, self.middleImage, croppedRightImage
 
-        leftXMin = min(leftPreTransCoords[0][0], leftPreTransCoords[1][0])
-        leftXMax = max(leftPreTransCoords[2][0], leftPreTransCoords[3][0])
-        middleXMin = min(middlePreTransCoords[0][0], middlePreTransCoords[1][0])
-        middleXMax = max(middlePreTransCoords[2][0], middlePreTransCoords[3][0])
-        rightXMin = min(rightPreTransCoords[0][0], rightPreTransCoords[1][0])
-        rightXMax = max(rightPreTransCoords[2][0], rightPreTransCoords[3][0])
+    def _findOverlapRegion (self, img1, img2, side):
+        """
+        Find the overlapping region between two images.
 
-        # Find the overlap area between the left and middle images
-        leftMiddleOverlapXMin = max(leftXMin, middleXMin)
-        leftMiddleOverlapXMax = min(leftXMax, middleXMax)
-        leftMiddleOverlapWidth = max(0, leftMiddleOverlapXMax - leftMiddleOverlapXMin)
+        Args:
+            img1, img2: The two images to compare
+            side: 'left' if checking overlap on left side of img2, 'right' if checking right side of img1
 
-        # Find the overlap area between the middle and right images
-        rightMiddleOverlapXMin = max(rightXMin, middleXMin)
-        rightMiddleOverlapXMax = min(rightXMax, middleXMax)
-        rightMiddleOverlapWidth = max(0, rightMiddleOverlapXMax - rightMiddleOverlapXMin)
+        Returns:
+            The width of the overlapping region in pixels
+        """
+        # Create feature detector
+        orb = cv2.ORB_create()
 
-        # Find the scaling factors and scale up the overlap areas
-        leftMiddleScalingFactor = self.getScalingFactor(leftPos, leftFwd)
-        rightMiddleScalingFactor = self.getScalingFactor(rightPos, rightFwd)
+        # Detect keypoints and compute descriptors
+        kp1, desc1 = orb.detectAndCompute(img1, None)
+        kp2, desc2 = orb.detectAndCompute(img2, None)
 
+        # Check if descriptors were found
+        if desc1 is None or desc2 is None or len(desc1) == 0 or len(desc2) == 0:
+            # Fallback if no features detected: use 10% of image width
+            return int(min(img1.shape[1], img2.shape[1]) * 0.1)
+
+        # Match features
+        bf = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
+        matches = bf.match(desc1, desc2)
+
+        if len(matches) == 0:
+            return int(min(img1.shape[1], img2.shape[1]) * 0.1)
+
+        # Get matched point locations
+        matched_points = []
+        for match in matches:
+            pt1 = kp1[match.queryIdx].pt
+            pt2 = kp2[match.trainIdx].pt
+            matched_points.append((pt1, pt2))
+
+        # Filter points to only include those in the relevant region (left/right edge)
+        filtered_points = []
+
+        if side == "right":  # img1's right side and img2's left side
+            img1_threshold = img1.shape[1] * 0.75  # Right 25% of img1
+            img2_threshold = img2.shape[1] * 0.25  # Left 25% of img2
+
+            for pt1, pt2 in matched_points:
+                if pt1[0] > img1_threshold and pt2[0] < img2_threshold:
+                    filtered_points.append((pt1, pt2))
+        else:  # img1's left side and img2's right side
+            img1_threshold = img1.shape[1] * 0.25  # Left 25% of img1
+            img2_threshold = img2.shape[1] * 0.75  # Right 25% of img2
+
+            for pt1, pt2 in matched_points:
+                if pt1[0] < img1_threshold and pt2[0] > img2_threshold:
+                    filtered_points.append((pt1, pt2))
+
+        # If no filtered points, use default
+        if len(filtered_points) == 0:
+            return int(min(img1.shape[1], img2.shape[1]) * 0.1)
+
+        # Calculate overlap based on matched points
+        if side == "right":
+            # Right side of img1 overlaps with left side of img2
+            avg_overlap = np.mean([img1.shape[1] - pt1[0] + pt2[0] for pt1, pt2 in filtered_points])
+        else:
+            # Left side of img1 overlaps with right side of img2
+            avg_overlap = np.mean([pt1[0] + (img2.shape[1] - pt2[0]) for pt1, pt2 in filtered_points])
+
+        return int(avg_overlap)
 
 
     def transformationMatrixMaker (self,

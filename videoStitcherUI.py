@@ -173,7 +173,7 @@ class VideoStitcherUI:
         # Output filename
         ttk.Label(outputFrame, text="Output Filename:").grid(row=1, column=0, sticky=tk.W, pady=5)
         ttk.Entry(outputFrame, textvariable=self.outputFilename, width=50).grid(row=1, column=1, padx=5, pady=5)
-        ttk.Label(outputFrame, text=".mp4").grid(row=1, column=2, sticky=tk.W, pady=5)
+        # ttk.Label(outputFrame, text=".mp4").grid(row=1, column=2, sticky=tk.W, pady=5)
 
         # Process button
         processFrame = ttk.Frame(mainFrame)
@@ -415,6 +415,7 @@ class VideoStitcherUI:
             transformer.transformLeftImage()
             transformer.transformMiddleImage()
             transformer.transformRightImage()
+            # Stitch the images together
             stitchedImage = transformer.stitchImages()
 
             # Convert to PIL format for display
@@ -512,6 +513,7 @@ class VideoStitcherUI:
             # Pass both the filename and the output directory to the VideoStitcher
             outputDir = self.outputFolder.get()
             videoStitcherObj.outputStitchedVideo(self.outputFilename.get(), outputDir)
+            statusVar.set("Processing complete! Output saved.")
 
             # Close progress window
             progressWindow.destroy()

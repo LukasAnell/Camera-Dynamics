@@ -25,19 +25,6 @@ class VideoStitcher:
 
 
     def outputStitchedVideo(self, fileName: str, outputDir: str = "Outputs"):
-        # fourcc = cv2.VideoWriter.fourcc(*'avc1')
-        # # Try a different codec that supports larger dimensions
-        # try:
-        #     fourcc = cv2.VideoWriter_fourcc(*'H264')  # H.264 codec
-        # except:
-        #     try:
-        #         fourcc = cv2.VideoWriter_fourcc(*'avc1')  # Alternative name for H.264
-        #     except:
-        #         try:
-        #             fourcc = cv2.VideoWriter_fourcc(*'XVID')  # XVID codec (more compatible)
-        #         except:
-        #             fourcc = cv2.VideoWriter_fourcc(*'MJPG')
-        # Ensure output directory exists
         import os
         if not os.path.exists(outputDir):
             os.makedirs(outputDir)
@@ -147,8 +134,9 @@ class VideoStitcher:
                     print(f"End of video reached or error reading frame {frameNumber}. Stopping.")
                     break
 
-                if frameNumber % 10 == 0:
-                    print(f"Processing frame {frameNumber} of {totalFrames}")
+                print(f"Processing frame {frameNumber} of {totalFrames}")
+                # if frameNumber % 10 == 0:
+                #     print(f"Processing frame {frameNumber} of {totalFrames}")
 
                 if leftFrame is None or middleFrame is None or rightFrame is None:
                     print(f"One of the frames is None at frame {frameNumber}. Skipping this frame.")
@@ -177,6 +165,7 @@ class VideoStitcher:
 
                 frameNumber += 1
         finally:
+            print(f"Finished processing {frameNumber} frames.")
             leftCap.release()
             middleCap.release()
             rightCap.release()
